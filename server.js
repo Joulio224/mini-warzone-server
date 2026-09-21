@@ -21,18 +21,38 @@ const HEAL_AMOUNT = 30;
 const LOOT_COLLECT_RADIUS = 1.8;
 const RESPAWN_DELAY_MS = 3000;
 
-// Quelques points de spawn répartis dans l'arène. À ajuster une fois la
-// vraie map en place et ses dimensions réelles connues.
-const SPAWN_POINTS = [
-  { x: 0, y: 1.7, z: 5 },
-  { x: 5, y: 1.7, z: 0 },
-  { x: -5, y: 1.7, z: 0 },
-  { x: 0, y: 1.7, z: -5 },
-  { x: 3.5, y: 1.7, z: 3.5 },
-  { x: -3.5, y: 1.7, z: -3.5 },
-];
-function randomSpawnPoint() {
-  return { ...SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)] };
+const TEAMS = ['red', 'blue'];
+
+// Correspond à la salle construite côté client (buildCustomRoom dans
+// src/main.js) : équipe rouge à l'ouest (x négatif), équipe bleue à l'est
+// (x positif). Si tu changes la taille de la salle côté client, ajuste ces
+// coordonnées en conséquence.
+const TEAM_SPAWN_POINTS = {
+  red: [
+    { x: -11, y: 1.7, z: -6 },
+    { x: -11, y: 1.7, z: 0 },
+    { x: -11, y: 1.7, z: 6 },
+  ],
+  blue: [
+    { x: 11, y: 1.7, z: -6 },
+    { x: 11, y: 1.7, z: 0 },
+    { x: 11, y: 1.7, z: 6 },
+  ],
+};
+
+function pickTeamSpawn(team) {
+  const points = TEAM_SPAWN_POINTS[team] || TEAM_SPAWN_POINTS[TEAMS[0]];
+  return { ...points[Math.floor(Math.random() * points.length)] };
+}
+
+// Équilibrage simple : le nouveau joueur rejoint l'équipe la moins nombreuse
+// (égalité → équipe rouge).
+function assignTeam() {
+  const counts = { red: 0, blue: 0 };
+  players.forEach((p) => {
+    counts[p.team] = (counts[p.team] || 0) + 1;
+  });
+  return counts.red <= counts.blue ? 'red' : 'blue';
 }
 
 const httpServer = createServer((req, res) => {
@@ -107,7 +127,7 @@ function killPlayer(victimId, killerId) {
 
   setTimeout(() => {
     if (!players.has(victimId)) return; // parti entre-temps
-    const spawn = randomSpawnPoint();
+    const spawn = pickTeamSpawn(victim.team);
     victim.alive = true;
     victim.hp = MAX_HP;
     victim.position = spawn;
@@ -119,12 +139,18 @@ function killPlayer(victimId, killerId) {
 io.on('connection', (socket) => {
   socket.on('join', (pseudoInput) => {
     const pseudo = String(pseudoInput || 'Joueur').slice(0, 20);
+    const team = assignTeam();
+    const spawn = pickTeamSpawn(team);
 
-    // On donne au nouveau venu la liste de ceux déjà dans l'arène, et le
-    // stuff déjà au sol...
+    // On dit au nouveau venu quelle équipe/quel point de spawn est le sien...
+    socket.emit('team-assigned', { team, spawn });
+
+    // ...puis on lui donne la liste de ceux déjà dans l'arène, et le stuff
+    // déjà au sol...
     const existingPlayers = Array.from(players.entries()).map(([id, p]) => ({
       id,
       pseudo: p.pseudo,
+      team: p.team,
       position: p.position,
       rotationY: p.rotationY,
       hp: p.hp,
@@ -138,18 +164,20 @@ io.on('connection', (socket) => {
     socket.emit('current-loot', existingLoot);
 
     // ...puis on l'ajoute et on prévient tout le monde.
-    const spawn = randomSpawnPoint();
     players.set(socket.id, {
       pseudo,
+      team,
       position: spawn,
       rotationY: 0,
       hp: MAX_HP,
       alive: true,
     });
 
-    socket.broadcast.emit('player-joined', { id: socket.id, pseudo, position: spawn });
+    socket.broadcast.emit('player-joined', { id: socket.id, pseudo, team, position: spawn });
 
-    console.log(`[+] ${pseudo} (${socket.id}) — ${players.size} joueur(s) connecté(s)`);
+    console.log(
+      `[+] ${pseudo} (${socket.id}) — équipe ${team} — ${players.size} joueur(s) connecté(s)`
+    );
   });
 
   socket.on('move', ({ position, rotationY } = {}) => {
