@@ -15,7 +15,16 @@ import { randomUUID } from 'node:crypto';
 const PORT = process.env.PORT || 3001;
 
 const MAX_HP = 100;
-const DAMAGE_PER_HIT = 25;
+// Dégâts par arme (nettement réduits par rapport à l'ancien DAMAGE_PER_HIT
+// fixe de 25) et cadence de tir minimale en secondes entre deux tirs — doit
+// rester identique à WEAPONS dans src/main.js, le serveur ne fait jamais
+// confiance au client pour les dégâts ou la cadence.
+const WEAPONS = {
+  pistol: { damage: 18, cooldown: 0.35 },
+  smg: { damage: 10, cooldown: 0.09 },
+  rifle: { damage: 16, cooldown: 0.18 },
+};
+const DEFAULT_WEAPON_ID = 'pistol';
 const HIT_RADIUS = 0.9; // sphère approximative autour de chaque joueur
 const HEAL_AMOUNT = 30;
 const LOOT_COLLECT_RADIUS = 1.8;
@@ -194,9 +203,16 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('shoot', ({ origin, direction } = {}) => {
+  socket.on('shoot', ({ origin, direction, weaponId } = {}) => {
     const shooter = players.get(socket.id);
     if (!shooter || !shooter.alive || !origin || !direction) return;
+
+    const weapon = WEAPONS[weaponId] || WEAPONS[DEFAULT_WEAPON_ID];
+    const now = Date.now();
+    // Petite tolérance (20ms) pour la latence réseau, sans quoi une cadence
+    // pile-poil correcte côté client se ferait parfois rejeter à tort.
+    if (now - (shooter.lastShotAt || 0) < weapon.cooldown * 1000 - 20) return;
+    shooter.lastShotAt = now;
 
     socket.broadcast.emit('player-shoot', { id: socket.id, origin, direction });
 
@@ -204,7 +220,7 @@ io.on('connection', (socket) => {
     if (!targetId) return;
 
     const target = players.get(targetId);
-    target.hp = Math.max(0, target.hp - DAMAGE_PER_HIT);
+    target.hp = Math.max(0, target.hp - weapon.damage);
     io.to(targetId).emit('your-hp', { hp: target.hp });
     socket.emit('hit-confirmed', { target: targetId });
 
