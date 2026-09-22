@@ -32,6 +32,85 @@ const RESPAWN_DELAY_MS = 3000;
 
 const TEAMS = ['red', 'blue'];
 
+// ---------------------------------------------------------------------------
+// Géométrie des obstacles (murs + caisses de couverture), copiée exactement
+// des dimensions de buildCustomRoom() dans src/main.js. Le serveur n'a pas de
+// moteur 3D : on stocke juste ces boîtes pour empêcher les tirs de traverser
+// murs/caisses. Si tu changes la salle côté client, mets ça à jour pareil.
+const ROOM_HALF_WIDTH = 15;
+const ROOM_HALF_DEPTH = 10;
+const WALL_HEIGHT = 5;
+const WALL_THICKNESS = 0.6;
+
+function wallBox(centerX, centerZ, width, depth) {
+  return {
+    minX: centerX - width / 2, maxX: centerX + width / 2,
+    minY: 0, maxY: WALL_HEIGHT,
+    minZ: centerZ - depth / 2, maxZ: centerZ + depth / 2,
+  };
+}
+function coverBox(centerX, centerZ, width, depth, height) {
+  return {
+    minX: centerX - width / 2, maxX: centerX + width / 2,
+    minY: 0, maxY: height,
+    minZ: centerZ - depth / 2, maxZ: centerZ + depth / 2,
+  };
+}
+
+const fullWidth = ROOM_HALF_WIDTH * 2 + WALL_THICKNESS * 2;
+const fullDepth = ROOM_HALF_DEPTH * 2;
+const OBSTACLES = [
+  wallBox(0, -ROOM_HALF_DEPTH, fullWidth, WALL_THICKNESS), // sud
+  wallBox(0, ROOM_HALF_DEPTH, fullWidth, WALL_THICKNESS), // nord
+  wallBox(-ROOM_HALF_WIDTH, 0, WALL_THICKNESS, fullDepth), // ouest
+  wallBox(ROOM_HALF_WIDTH, 0, WALL_THICKNESS, fullDepth), // est
+  coverBox(-6, -4, 2, 2, 1.6),
+  coverBox(-6, 4, 2, 2, 1.6),
+  coverBox(0, -6, 3, 1.2, 1.6),
+  coverBox(0, 6, 3, 1.2, 1.6),
+  coverBox(6, -4, 2, 2, 1.6),
+  coverBox(6, 4, 2, 2, 1.6),
+  coverBox(-2.5, 0, 1.5, 1.5, 1.6),
+  coverBox(2.5, 0, 1.5, 1.5, 1.6),
+];
+
+// Distance d'intersection rayon/boîte (test des "tranches" standard). Rend
+// null si le rayon ne touche pas la boîte, sinon la distance du premier point
+// de contact.
+function rayBoxDistance(ox, oy, oz, dx, dy, dz, box) {
+  const o = [ox, oy, oz];
+  const d = [dx, dy, dz];
+  const min = [box.minX, box.minY, box.minZ];
+  const max = [box.maxX, box.maxY, box.maxZ];
+  let tmin = 0;
+  let tmax = Infinity;
+  for (let i = 0; i < 3; i++) {
+    if (Math.abs(d[i]) < 1e-8) {
+      if (o[i] < min[i] || o[i] > max[i]) return null;
+      continue;
+    }
+    let t1 = (min[i] - o[i]) / d[i];
+    let t2 = (max[i] - o[i]) / d[i];
+    if (t1 > t2) [t1, t2] = [t2, t1];
+    tmin = Math.max(tmin, t1);
+    tmax = Math.min(tmax, t2);
+    if (tmin > tmax) return null;
+  }
+  return tmin;
+}
+
+// Distance jusqu'au premier obstacle touché par ce tir (Infinity si aucun) —
+// sert à la fois à limiter la portée visuelle du traceur ET à empêcher un tir
+// de toucher quelqu'un caché derrière un mur/une caisse.
+function nearestObstacleDistance(origin, direction) {
+  let nearest = Infinity;
+  for (const box of OBSTACLES) {
+    const dist = rayBoxDistance(origin.x, origin.y, origin.z, direction.x, direction.y, direction.z, box);
+    if (dist !== null && dist >= 0 && dist < nearest) nearest = dist;
+  }
+  return nearest;
+}
+
 // Correspond à la salle construite côté client (buildCustomRoom dans
 // src/main.js) : équipe rouge à l'ouest (x négatif), équipe bleue à l'est
 // (x positif). Si tu changes la taille de la salle côté client, ajuste ces
@@ -103,9 +182,9 @@ function raySphereDistance(origin, dir, center, radius) {
   return t >= 0 ? t : 0;
 }
 
-function findClosestHit(shooterId, origin, direction) {
+function findClosestHit(shooterId, origin, direction, maxDistance) {
   let closestId = null;
-  let closestDistance = Infinity;
+  let closestDistance = maxDistance;
 
   players.forEach((player, id) => {
     if (id === shooterId || !player.alive) return;
@@ -214,9 +293,15 @@ io.on('connection', (socket) => {
     if (now - (shooter.lastShotAt || 0) < weapon.cooldown * 1000 - 20) return;
     shooter.lastShotAt = now;
 
-    socket.broadcast.emit('player-shoot', { id: socket.id, origin, direction });
+    const obstacleDistance = nearestObstacleDistance(origin, direction);
+    socket.broadcast.emit('player-shoot', {
+      id: socket.id,
+      origin,
+      direction,
+      maxLength: Math.min(obstacleDistance, 60),
+    });
 
-    const targetId = findClosestHit(socket.id, origin, direction);
+    const targetId = findClosestHit(socket.id, origin, direction, obstacleDistance);
     if (!targetId) return;
 
     const target = players.get(targetId);
