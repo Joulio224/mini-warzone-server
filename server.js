@@ -30,6 +30,22 @@ const HEAL_AMOUNT = 30;
 const LOOT_COLLECT_RADIUS = 1.8;
 const RESPAWN_DELAY_MS = 3000;
 
+// Bouclier (gilets pare-balle) : jusqu'à 3 gilets, chacun absorbe des dégâts
+// avant qu'ils n'entament les HP. Doit rester identique à src/main.js (les
+// mêmes valeurs y servent à calculer l'assombrissement visuel du joueur).
+const SHIELD_PER_VEST = 25;
+const MAX_SHIELD_VESTS = 3;
+const MAX_SHIELD = SHIELD_PER_VEST * MAX_SHIELD_VESTS;
+const VEST_COLLECT_RADIUS = 1.8;
+const VEST_RESPAWN_MS = 25000;
+
+function shieldSteps(shield) {
+  return Math.min(MAX_SHIELD_VESTS, Math.ceil(shield / SHIELD_PER_VEST));
+}
+
+// Argent gagné à chaque élimination, affiché en haut de l'écran côté client.
+const KILL_REWARD = 50;
+
 const TEAMS = ['red', 'blue'];
 
 // ---------------------------------------------------------------------------
@@ -158,11 +174,26 @@ const io = new Server(httpServer, {
   },
 });
 
-// socket.id -> { pseudo, position: {x,y,z}, rotationY, hp, alive }
+// socket.id -> { pseudo, position: {x,y,z}, rotationY, hp, shield, money, alive }
 const players = new Map();
 
 // lootId -> { position: {x,y,z} }
 const loot = new Map();
+
+// Gilets pare-balle : contrairement au loot (qui tombe des joueurs tués),
+// ils réapparaissent tout seuls à des emplacements fixes, après un délai.
+const VEST_SPAWN_POINTS = [
+  { x: -2.5, y: 1, z: 3 },
+  { x: 2.5, y: 1, z: -3 },
+];
+const vests = new Map(); // vestId -> { position, spawnIndex }
+
+function spawnVestAt(spawnIndex) {
+  const vestId = randomUUID();
+  const position = VEST_SPAWN_POINTS[spawnIndex];
+  vests.set(vestId, { position, spawnIndex });
+  io.emit('vest-spawned', { id: vestId, position });
+}
 
 // ---------------------------------------------------------------------------
 // Détection de tir : test rayon-sphère simple, pas besoin de Three.js côté
@@ -198,12 +229,28 @@ function findClosestHit(shooterId, origin, direction, maxDistance) {
   return closestId;
 }
 
+// Diffusé à TOUT le monde (pas juste au joueur concerné) car l'assombrissement
+// du gilet doit être visible par les autres joueurs.
+function broadcastShieldSteps(id, player) {
+  io.emit('player-shield-steps', { id, steps: shieldSteps(player.shield) });
+}
+
 function killPlayer(victimId, killerId) {
   const victim = players.get(victimId);
   if (!victim) return;
 
   victim.alive = false;
   victim.hp = 0;
+  victim.shield = 0; // le gilet ne survit pas à la mort
+  broadcastShieldSteps(victimId, victim);
+
+  if (killerId) {
+    const killer = players.get(killerId);
+    if (killer) {
+      killer.money = (killer.money || 0) + KILL_REWARD;
+      io.to(killerId).emit('your-money', { money: killer.money });
+    }
+  }
 
   io.emit('player-died', { id: victimId, killedBy: killerId || null });
   io.to(victimId).emit('you-died');
@@ -242,6 +289,7 @@ io.on('connection', (socket) => {
       position: p.position,
       rotationY: p.rotationY,
       hp: p.hp,
+      shieldSteps: shieldSteps(p.shield),
     }));
     socket.emit('current-players', existingPlayers);
 
@@ -251,6 +299,12 @@ io.on('connection', (socket) => {
     }));
     socket.emit('current-loot', existingLoot);
 
+    const existingVests = Array.from(vests.entries()).map(([id, v]) => ({
+      id,
+      position: v.position,
+    }));
+    socket.emit('current-vests', existingVests);
+
     // ...puis on l'ajoute et on prévient tout le monde.
     players.set(socket.id, {
       pseudo,
@@ -258,6 +312,8 @@ io.on('connection', (socket) => {
       position: spawn,
       rotationY: 0,
       hp: MAX_HP,
+      shield: 0,
+      money: 0,
       alive: true,
     });
 
@@ -305,7 +361,15 @@ io.on('connection', (socket) => {
     if (!targetId) return;
 
     const target = players.get(targetId);
-    target.hp = Math.max(0, target.hp - weapon.damage);
+    let damage = weapon.damage;
+    if (target.shield > 0) {
+      const absorbed = Math.min(target.shield, damage);
+      target.shield -= absorbed;
+      damage -= absorbed;
+      io.to(targetId).emit('your-shield', { shield: target.shield });
+      broadcastShieldSteps(targetId, target);
+    }
+    target.hp = Math.max(0, target.hp - damage);
     io.to(targetId).emit('your-hp', { hp: target.hp });
     socket.emit('hit-confirmed', { target: targetId });
 
@@ -332,6 +396,27 @@ io.on('connection', (socket) => {
     io.to(socket.id).emit('your-hp', { hp: player.hp });
   });
 
+  socket.on('collect-vest', ({ vestId } = {}) => {
+    const player = players.get(socket.id);
+    const vest = vests.get(vestId);
+    if (!player || !player.alive || !vest) return;
+
+    const dx = player.position.x - vest.position.x;
+    const dy = player.position.y - vest.position.y;
+    const dz = player.position.z - vest.position.z;
+    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (distance > VEST_COLLECT_RADIUS) return;
+
+    vests.delete(vestId);
+    io.emit('vest-removed', { id: vestId });
+
+    player.shield = Math.min(MAX_SHIELD, player.shield + SHIELD_PER_VEST);
+    io.to(socket.id).emit('your-shield', { shield: player.shield });
+    broadcastShieldSteps(socket.id, player);
+
+    setTimeout(() => spawnVestAt(vest.spawnIndex), VEST_RESPAWN_MS);
+  });
+
   socket.on('disconnect', () => {
     const player = players.get(socket.id);
     if (!player) return;
@@ -342,5 +427,6 @@ io.on('connection', (socket) => {
 });
 
 httpServer.listen(PORT, () => {
+  VEST_SPAWN_POINTS.forEach((_, index) => spawnVestAt(index));
   console.log(`Serveur Mini Warzone (Socket.io) lancé sur http://localhost:${PORT}`);
 });
