@@ -30,14 +30,26 @@ const HEAL_AMOUNT = 30;
 const LOOT_COLLECT_RADIUS = 1.8;
 const RESPAWN_DELAY_MS = 3000;
 
-// Bouclier (gilets pare-balle) : jusqu'à 3 gilets, chacun absorbe des dégâts
-// avant qu'ils n'entament les HP. Doit rester identique à src/main.js (les
-// mêmes valeurs y servent à calculer l'assombrissement visuel du joueur).
+// Bouclier (gilets pare-balle) : max 2 gilets dans le "stuff", chacun ajouté
+// au bouclier seulement quand le joueur choisit de l'utiliser (clic droit
+// sur le slot gilets) — pas automatiquement au ramassage. Doit rester
+// identique à src/main.js (mêmes valeurs pour l'assombrissement visuel).
 const SHIELD_PER_VEST = 25;
-const MAX_SHIELD_VESTS = 3;
+const MAX_SHIELD_VESTS = 2;
 const MAX_SHIELD = SHIELD_PER_VEST * MAX_SHIELD_VESTS;
 const VEST_COLLECT_RADIUS = 1.8;
 const VEST_RESPAWN_MS = 25000;
+
+// Armes ramassables au sol : le slot 0 est toujours le pistolet de départ
+// (jamais perdu), le slot 1 se remplit en ramassant une arme au sol — un
+// point de spawn fixe par arme, jamais aléatoire.
+const WEAPON_PICKUP_POINTS = [
+  { weaponId: 'smg', x: -6, y: 1, z: 0 },
+  { weaponId: 'rifle', x: 6, y: 1, z: 0 },
+];
+const WEAPON_PICKUP_COLLECT_RADIUS = 1.8;
+const WEAPON_PICKUP_RESPAWN_MS = 30000;
+const MAX_WEAPON_SLOTS = 2;
 
 function shieldSteps(shield) {
   return Math.min(MAX_SHIELD_VESTS, Math.ceil(shield / SHIELD_PER_VEST));
@@ -195,6 +207,16 @@ function spawnVestAt(spawnIndex) {
   io.emit('vest-spawned', { id: vestId, position });
 }
 
+// weaponPickupId -> { weaponId, position, spawnIndex }
+const weaponPickups = new Map();
+
+function spawnWeaponPickupAt(spawnIndex) {
+  const pickupId = randomUUID();
+  const { weaponId, x, y, z } = WEAPON_PICKUP_POINTS[spawnIndex];
+  weaponPickups.set(pickupId, { weaponId, position: { x, y, z }, spawnIndex });
+  io.emit('weapon-pickup-spawned', { id: pickupId, weaponId, position: { x, y, z } });
+}
+
 // ---------------------------------------------------------------------------
 // Détection de tir : test rayon-sphère simple, pas besoin de Three.js côté
 // serveur — juste de la géométrie de base. On garde le point d'impact le
@@ -241,7 +263,8 @@ function killPlayer(victimId, killerId) {
 
   victim.alive = false;
   victim.hp = 0;
-  victim.shield = 0; // le gilet ne survit pas à la mort
+  victim.shield = 0; // le gilet équipé ne survit pas à la mort
+  victim.vestCount = 0; // les gilets en réserve non plus
   broadcastShieldSteps(victimId, victim);
 
   if (killerId) {
@@ -266,7 +289,11 @@ function killPlayer(victimId, killerId) {
     victim.alive = true;
     victim.hp = MAX_HP;
     victim.position = spawn;
+    victim.weapons = ['pistol', null]; // on repart avec juste le pistolet
+    victim.vestCount = 0;
     io.to(victimId).emit('you-respawned', { position: spawn });
+    io.to(victimId).emit('your-weapons', { weapons: victim.weapons });
+    io.to(victimId).emit('your-vest-count', { count: victim.vestCount });
     io.emit('player-respawned', { id: victimId, position: spawn });
   }, RESPAWN_DELAY_MS);
 }
@@ -305,6 +332,13 @@ io.on('connection', (socket) => {
     }));
     socket.emit('current-vests', existingVests);
 
+    const existingWeaponPickups = Array.from(weaponPickups.entries()).map(([id, w]) => ({
+      id,
+      weaponId: w.weaponId,
+      position: w.position,
+    }));
+    socket.emit('current-weapon-pickups', existingWeaponPickups);
+
     // ...puis on l'ajoute et on prévient tout le monde.
     players.set(socket.id, {
       pseudo,
@@ -313,9 +347,13 @@ io.on('connection', (socket) => {
       rotationY: 0,
       hp: MAX_HP,
       shield: 0,
+      weapons: ['pistol', null],
+      vestCount: 0,
       money: 0,
       alive: true,
     });
+    socket.emit('your-weapons', { weapons: ['pistol', null] });
+    socket.emit('your-vest-count', { count: 0 });
 
     socket.broadcast.emit('player-joined', { id: socket.id, pseudo, team, position: spawn });
 
@@ -341,6 +379,7 @@ io.on('connection', (socket) => {
   socket.on('shoot', ({ origin, direction, weaponId } = {}) => {
     const shooter = players.get(socket.id);
     if (!shooter || !shooter.alive || !origin || !direction) return;
+    if (!shooter.weapons.includes(weaponId)) return; // n'a pas cette arme dans son stuff
 
     const weapon = WEAPONS[weaponId] || WEAPONS[DEFAULT_WEAPON_ID];
     const now = Date.now();
@@ -400,6 +439,7 @@ io.on('connection', (socket) => {
     const player = players.get(socket.id);
     const vest = vests.get(vestId);
     if (!player || !player.alive || !vest) return;
+    if (player.vestCount >= MAX_SHIELD_VESTS) return; // stuff déjà plein
 
     const dx = player.position.x - vest.position.x;
     const dy = player.position.y - vest.position.y;
@@ -410,11 +450,45 @@ io.on('connection', (socket) => {
     vests.delete(vestId);
     io.emit('vest-removed', { id: vestId });
 
-    player.shield = Math.min(MAX_SHIELD, player.shield + SHIELD_PER_VEST);
-    io.to(socket.id).emit('your-shield', { shield: player.shield });
-    broadcastShieldSteps(socket.id, player);
+    player.vestCount += 1;
+    io.to(socket.id).emit('your-vest-count', { count: player.vestCount });
 
     setTimeout(() => spawnVestAt(vest.spawnIndex), VEST_RESPAWN_MS);
+  });
+
+  // Activation d'un gilet en réserve (clic droit avec le slot gilets
+  // sélectionné) : consomme 1 gilet du stuff, ajoute au bouclier actif.
+  socket.on('use-vest', () => {
+    const player = players.get(socket.id);
+    if (!player || !player.alive || player.vestCount <= 0) return;
+
+    player.vestCount -= 1;
+    player.shield = Math.min(MAX_SHIELD, player.shield + SHIELD_PER_VEST);
+    io.to(socket.id).emit('your-vest-count', { count: player.vestCount });
+    io.to(socket.id).emit('your-shield', { shield: player.shield });
+    broadcastShieldSteps(socket.id, player);
+  });
+
+  socket.on('collect-weapon', ({ pickupId } = {}) => {
+    const player = players.get(socket.id);
+    const pickup = weaponPickups.get(pickupId);
+    if (!player || !player.alive || !pickup) return;
+    if (player.weapons[1]) return; // slot 2 déjà occupé, stuff plein pour les armes
+    if (player.weapons.includes(pickup.weaponId)) return; // déjà cette arme
+
+    const dx = player.position.x - pickup.position.x;
+    const dy = player.position.y - pickup.position.y;
+    const dz = player.position.z - pickup.position.z;
+    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (distance > WEAPON_PICKUP_COLLECT_RADIUS) return;
+
+    weaponPickups.delete(pickupId);
+    io.emit('weapon-pickup-removed', { id: pickupId });
+
+    player.weapons[1] = pickup.weaponId;
+    io.to(socket.id).emit('your-weapons', { weapons: player.weapons });
+
+    setTimeout(() => spawnWeaponPickupAt(pickup.spawnIndex), WEAPON_PICKUP_RESPAWN_MS);
   });
 
   socket.on('disconnect', () => {
@@ -428,5 +502,6 @@ io.on('connection', (socket) => {
 
 httpServer.listen(PORT, () => {
   VEST_SPAWN_POINTS.forEach((_, index) => spawnVestAt(index));
+  WEAPON_PICKUP_POINTS.forEach((_, index) => spawnWeaponPickupAt(index));
   console.log(`Serveur Mini Warzone (Socket.io) lancé sur http://localhost:${PORT}`);
 });
