@@ -4,7 +4,8 @@
 // Rôle : synchroniser les positions des joueurs, les tirs, la vie et le loot
 // au sol entre tous les clients connectés. Ne gère PAS les comptes/amis/
 // groupes (ça, c'est Firebase, côté client) — ce serveur ne connaît que des
-// sockets, des positions, et maintenant des points de vie.
+// sockets, des positions, des points de vie... et maintenant de l'argent et
+// des achats (voir la section ÉCONOMIE ci-dessous).
 //
 // En dev : lance ce serveur séparément du client (`npm run dev` ici, dans un
 // 2e terminal), pendant que le client tourne sur http://localhost:5173.
@@ -15,61 +16,185 @@ import { randomUUID } from 'node:crypto';
 const PORT = process.env.PORT || 3001;
 
 const MAX_HP = 100;
-// Dégâts par arme (nettement réduits par rapport à l'ancien DAMAGE_PER_HIT
-// fixe de 25) et cadence de tir minimale en secondes entre deux tirs — doit
-// rester identique à WEAPONS dans src/main.js, le serveur ne fait jamais
-// confiance au client pour les dégâts ou la cadence.
-const WEAPONS = {
-  pistol: { damage: 18, cooldown: 0.35 },
-  smg: { damage: 10, cooldown: 0.09 },
-  rifle: { damage: 16, cooldown: 0.18 },
-};
-const DEFAULT_WEAPON_ID = 'pistol';
-const HIT_RADIUS = 0.9; // sphère approximative autour de chaque joueur
+const BODY_HIT_RADIUS = 0.35; // calé sur le rayon réel de la capsule visuelle du joueur
+const HEAD_HIT_RADIUS = 0.25; // calé sur le rayon réel de la sphère "tête" du modèle
+const HEADSHOT_MULTIPLIER = 2;
+// Hauteurs testées le long du corps (relatives à position.y, qui est la
+// hauteur des yeux) — une approximation simple d'une capsule verticale, sans
+// faire de vraie géométrie de capsule côté serveur.
+const BODY_SAMPLE_OFFSETS = [-1.6, -1.1, -0.6]; // pieds -> torse (s'arrête avant la tête, zone séparée ci-dessous)
+// Un seul point, calé exactement sur le centre de la sphère "tête" du modèle
+// visuel (voir createPlayerMesh dans main.js : sphère rayon 0.25 à y=1.65
+// dans le groupe local, dont l'origine est position.y - EYE_HEIGHT(1.7)).
+const HEAD_SAMPLE_OFFSETS = [-0.05];
 const HEAL_AMOUNT = 30;
 const LOOT_COLLECT_RADIUS = 1.8;
 const RESPAWN_DELAY_MS = 3000;
 
-// Bouclier (gilets pare-balle) : max 2 gilets dans le "stuff", chacun ajouté
-// au bouclier seulement quand le joueur choisit de l'utiliser (clic droit
-// sur le slot gilets) — pas automatiquement au ramassage. Doit rester
-// identique à src/main.js (mêmes valeurs pour l'assombrissement visuel).
+// Dimensions de la salle (avec balcon) — doivent rester identiques à
+// src/main.js. Définies ici, tout en haut, car WEAPON_PICKUP_POINTS
+// ci-dessous a besoin de BALCONY_HEIGHT pour placer l'arme sur le balcon.
+const ROOM_HALF_WIDTH = 20;
+const ROOM_HALF_DEPTH = 14;
+const WALL_HEIGHT = 5;
+const WALL_THICKNESS = 0.6;
+const BALCONY_HEIGHT = 3.2;
+const BALCONY_THICKNESS = 0.3;
+
+// Bouclier (gilets pare-balle) : le "stuff" contient des gilets en réserve
+// (ramassés au sol ou achetés en boutique), chacun ajouté au bouclier actif
+// seulement quand le joueur choisit de l'utiliser (clic droit sur le slot
+// gilets) — pas automatiquement au ramassage/achat. MAX_SHIELD_VESTS est le
+// nombre de base (2) ; la capacité spéciale "3e emplacement de gilet" (voir
+// ÉCONOMIE) le porte à 3 pour le joueur qui l'achète, jusqu'à la fin de la
+// partie en cours. Doit rester identique à src/shop.js et src/main.js.
 const SHIELD_PER_VEST = 25;
 const MAX_SHIELD_VESTS = 2;
-const MAX_SHIELD = SHIELD_PER_VEST * MAX_SHIELD_VESTS;
 const VEST_COLLECT_RADIUS = 1.8;
 const VEST_RESPAWN_MS = 25000;
 
 // Armes ramassables au sol : le slot 0 est toujours le pistolet de départ
 // (jamais perdu), le slot 1 se remplit en ramassant une arme au sol — un
-// point de spawn fixe par arme, jamais aléatoire.
+// point de spawn fixe par arme, jamais aléatoire. Les armes trouvées au sol
+// sont toujours de rareté "gray" (la rareté supérieure ne s'obtient qu'en
+// boutique, voir ÉCONOMIE).
 const WEAPON_PICKUP_POINTS = [
   { weaponId: 'smg', x: -6, y: 1, z: 0 },
   { weaponId: 'rifle', x: 6, y: 1, z: 0 },
+  { weaponId: 'rifle', x: 0, y: BALCONY_HEIGHT + 0.6, z: 11 }, // sur le balcon
 ];
 const WEAPON_PICKUP_COLLECT_RADIUS = 1.8;
 const WEAPON_PICKUP_RESPAWN_MS = 30000;
-const MAX_WEAPON_SLOTS = 2;
 
-function shieldSteps(shield) {
-  return Math.min(MAX_SHIELD_VESTS, Math.ceil(shield / SHIELD_PER_VEST));
+function shieldSteps(player) {
+  return Math.min(player.maxVestSlots, Math.ceil(player.shield / SHIELD_PER_VEST));
+}
+function maxShieldFor(player) {
+  return SHIELD_PER_VEST * player.maxVestSlots;
 }
 
 // Argent gagné à chaque élimination, affiché en haut de l'écran côté client.
+// Ne se réinitialise jamais (ni à la mort, ni au respawn) — seule la
+// boutique en dépense.
 const KILL_REWARD = 50;
+
+// ---------------------------------------------------------------------------
+// ÉCONOMIE — rareté des armes + catalogue boutique + achats
+// ---------------------------------------------------------------------------
+// 3 paliers de rareté, du plus faible au plus fort. Chaque palier multiplie
+// les dégâts de l'arme par 1.15 PAR RAPPORT AU PALIER PRÉCÉDENT (effet
+// cumulatif, pas juste +15% par rapport au gris) :
+//   gris  = ×1
+//   bleu  = ×1.15
+//   rouge = ×1.15² = ×1.3225 (~+32% par rapport au gris)
+// Doit rester identique à RARITIES / RARITY_DAMAGE_STEP dans src/shop.js.
+const RARITIES = ['gray', 'blue', 'red'];
+const RARITY_DAMAGE_STEP = 1.15;
+function rarityDamageMultiplier(rarity) {
+  const index = RARITIES.indexOf(rarity);
+  return RARITY_DAMAGE_STEP ** Math.max(0, index);
+}
+
+// Dégâts de base (palier gris) et cadence de tir par TYPE d'arme — la
+// cadence ne dépend jamais de la rareté, seuls les dégâts changent. Doit
+// rester identique à WEAPON_BASE dans src/shop.js. Le serveur ne fait
+// jamais confiance au client pour les dégâts ou la cadence : le tir envoie
+// juste un numéro de slot, le serveur regarde lui-même ce qui s'y trouve.
+const WEAPON_BASE = {
+  pistol: { baseDamage: 18, cooldown: 0.35 },
+  smg: { baseDamage: 10, cooldown: 0.09 },
+  rifle: { baseDamage: 16, cooldown: 0.18 },
+};
+const DEFAULT_WEAPON_ID = 'pistol';
+
+function weaponDamage(weaponId, rarity) {
+  const base = WEAPON_BASE[weaponId] || WEAPON_BASE[DEFAULT_WEAPON_ID];
+  return Math.round(base.baseDamage * rarityDamageMultiplier(rarity));
+}
+function weaponCooldown(weaponId) {
+  const base = WEAPON_BASE[weaponId] || WEAPON_BASE[DEFAULT_WEAPON_ID];
+  return base.cooldown;
+}
+
+// Prix de base (palier gris) par type d'arme, et multiplicateur de PRIX par
+// palier de rareté — volontairement plus agressif que le multiplicateur de
+// dégâts ci-dessus, pour que le rouge reste un achat de fin de partie et pas
+// un simple confort. Doit rester identique à WEAPON_BASE / RARITY_PRICE_MULTIPLIER
+// dans src/shop.js.
+const WEAPON_BASE_PRICE = { pistol: 90, smg: 80, rifle: 110 };
+const RARITY_PRICE_MULTIPLIER = { gray: 1, blue: 2, red: 3.5 };
+function weaponPrice(weaponId, rarity) {
+  const base = WEAPON_BASE_PRICE[weaponId] || 100;
+  return Math.round(base * (RARITY_PRICE_MULTIPLIER[rarity] ?? 1));
+}
+
+const VEST_PRICE = 60;
+// Capacité spéciale : débloque un 3e emplacement de gilet (réserve + bouclier
+// actif) pour le reste de la partie EN COURS — ne se réinitialise jamais à
+// la mort/au respawn, contrairement aux gilets en réserve et aux armes.
+const ABILITY_EXTRA_VEST_PRICE = 300;
+const ABILITY_MAX_VEST_SLOTS = MAX_SHIELD_VESTS + 1;
+
+// itemId attendu pour chaque type d'achat — doit rester identique aux id
+// générés par buildCatalog() dans src/shop.js.
+function isWeaponItemId(itemId) {
+  return /^weapon:(pistol|smg|rifle):(gray|blue|red)$/.exec(itemId);
+}
+
+// Traite un achat pour `player` (déjà vérifié vivant par l'appelant). Ne
+// fait RIEN silencieusement si l'achat est invalide (fonds insuffisants,
+// déjà possédé, slot déjà plein…) — même logique "no-op silencieux" que le
+// reste du serveur (ex. collect-vest quand la réserve est pleine) : le
+// client empêche déjà ça via les boutons désactivés, ceci n'est qu'un
+// filet de sécurité côté autorité.
+function tryPurchase(socket, player, itemId) {
+  if (itemId === 'vest') {
+    if (player.vestCount >= player.maxVestSlots) return;
+    if (player.money < VEST_PRICE) return;
+    player.money -= VEST_PRICE;
+    player.vestCount += 1;
+    io.to(socket.id).emit('your-money', { money: player.money });
+    io.to(socket.id).emit('your-vest-count', { count: player.vestCount });
+    return;
+  }
+
+  if (itemId === 'ability-extra-vest-slot') {
+    if (player.maxVestSlots >= ABILITY_MAX_VEST_SLOTS) return;
+    if (player.money < ABILITY_EXTRA_VEST_PRICE) return;
+    player.money -= ABILITY_EXTRA_VEST_PRICE;
+    player.maxVestSlots = ABILITY_MAX_VEST_SLOTS;
+    io.to(socket.id).emit('your-money', { money: player.money });
+    io.to(socket.id).emit('your-abilities', { maxVestSlots: player.maxVestSlots });
+    return;
+  }
+
+  const weaponMatch = isWeaponItemId(itemId);
+  if (weaponMatch) {
+    const [, weaponId, rarity] = weaponMatch;
+    const price = weaponPrice(weaponId, rarity);
+    if (player.money < price) return;
+
+    // Le pistolet occupe toujours le slot 0 (l'achat ne fait qu'améliorer sa
+    // rareté) ; mitraillette/fusil vont dans le slot 1 (remplace ce qui s'y
+    // trouve déjà, y compris une arme ramassée au sol).
+    const slot = weaponId === 'pistol' ? 0 : 1;
+
+    player.money -= price;
+    player.weapons[slot] = { id: weaponId, rarity };
+    io.to(socket.id).emit('your-money', { money: player.money });
+    io.to(socket.id).emit('your-weapons', { weapons: player.weapons });
+  }
+}
 
 const TEAMS = ['red', 'blue'];
 
 // ---------------------------------------------------------------------------
-// Géométrie des obstacles (murs + caisses de couverture), copiée exactement
-// des dimensions de buildCustomRoom() dans src/main.js. Le serveur n'a pas de
-// moteur 3D : on stocke juste ces boîtes pour empêcher les tirs de traverser
-// murs/caisses. Si tu changes la salle côté client, mets ça à jour pareil.
-const ROOM_HALF_WIDTH = 15;
-const ROOM_HALF_DEPTH = 10;
-const WALL_HEIGHT = 5;
-const WALL_THICKNESS = 0.6;
-
+// Géométrie des obstacles (murs + balcon + caisses de couverture), copiée
+// exactement des dimensions de buildCustomRoom() dans src/main.js. Le
+// serveur n'a pas de moteur 3D : on stocke juste ces boîtes pour empêcher
+// les tirs de traverser murs/balcon/caisses. Si tu changes la salle côté
+// client, mets ça à jour pareil. (ROOM_HALF_WIDTH etc. sont définies tout en
+// haut du fichier, voir plus haut.)
 function wallBox(centerX, centerZ, width, depth) {
   return {
     minX: centerX - width / 2, maxX: centerX + width / 2,
@@ -87,11 +212,20 @@ function coverBox(centerX, centerZ, width, depth, height) {
 
 const fullWidth = ROOM_HALF_WIDTH * 2 + WALL_THICKNESS * 2;
 const fullDepth = ROOM_HALF_DEPTH * 2;
+const balconyWidth = ROOM_HALF_WIDTH * 2 - 6;
+const balconyDepth = 6;
 const OBSTACLES = [
   wallBox(0, -ROOM_HALF_DEPTH, fullWidth, WALL_THICKNESS), // sud
   wallBox(0, ROOM_HALF_DEPTH, fullWidth, WALL_THICKNESS), // nord
   wallBox(-ROOM_HALF_WIDTH, 0, WALL_THICKNESS, fullDepth), // ouest
   wallBox(ROOM_HALF_WIDTH, 0, WALL_THICKNESS, fullDepth), // est
+  {
+    // Sol du balcon : ne bloque un tir qu'à sa hauteur (autour de
+    // BALCONY_HEIGHT), pas les tirs à hauteur normale en dessous.
+    minX: -balconyWidth / 2, maxX: balconyWidth / 2,
+    minY: BALCONY_HEIGHT - BALCONY_THICKNESS / 2, maxY: BALCONY_HEIGHT + BALCONY_THICKNESS / 2,
+    minZ: ROOM_HALF_DEPTH - balconyDepth, maxZ: ROOM_HALF_DEPTH,
+  },
   coverBox(-6, -4, 2, 2, 1.6),
   coverBox(-6, 4, 2, 2, 1.6),
   coverBox(0, -6, 3, 1.2, 1.6),
@@ -100,6 +234,7 @@ const OBSTACLES = [
   coverBox(6, 4, 2, 2, 1.6),
   coverBox(-2.5, 0, 1.5, 1.5, 1.6),
   coverBox(2.5, 0, 1.5, 1.5, 1.6),
+  coverBox(0, 0, 2.3, 1.1, 1.0), // table de la boutique, au centre
 ];
 
 // Distance d'intersection rayon/boîte (test des "tranches" standard). Rend
@@ -145,14 +280,14 @@ function nearestObstacleDistance(origin, direction) {
 // coordonnées en conséquence.
 const TEAM_SPAWN_POINTS = {
   red: [
-    { x: -11, y: 1.7, z: -6 },
-    { x: -11, y: 1.7, z: 0 },
-    { x: -11, y: 1.7, z: 6 },
+    { x: -15, y: 1.7, z: -8 },
+    { x: -15, y: 1.7, z: 0 },
+    { x: -15, y: 1.7, z: 6 },
   ],
   blue: [
-    { x: 11, y: 1.7, z: -6 },
-    { x: 11, y: 1.7, z: 0 },
-    { x: 11, y: 1.7, z: 6 },
+    { x: 15, y: 1.7, z: -8 },
+    { x: 15, y: 1.7, z: 0 },
+    { x: 15, y: 1.7, z: 6 },
   ],
 };
 
@@ -186,7 +321,8 @@ const io = new Server(httpServer, {
   },
 });
 
-// socket.id -> { pseudo, position: {x,y,z}, rotationY, hp, shield, money, alive }
+// socket.id -> { pseudo, position, rotationY, hp, shield, weapons, vestCount,
+//                maxVestSlots, money, alive }
 const players = new Map();
 
 // lootId -> { position: {x,y,z} }
@@ -238,23 +374,39 @@ function raySphereDistance(origin, dir, center, radius) {
 function findClosestHit(shooterId, origin, direction, maxDistance) {
   let closestId = null;
   let closestDistance = maxDistance;
+  let closestIsHeadshot = false;
 
   players.forEach((player, id) => {
     if (id === shooterId || !player.alive) return;
-    const dist = raySphereDistance(origin, direction, player.position, HIT_RADIUS);
-    if (dist !== null && dist < closestDistance) {
-      closestDistance = dist;
-      closestId = id;
+
+    for (const offsetY of HEAD_SAMPLE_OFFSETS) {
+      const center = { x: player.position.x, y: player.position.y + offsetY, z: player.position.z };
+      const dist = raySphereDistance(origin, direction, center, HEAD_HIT_RADIUS);
+      if (dist !== null && dist < closestDistance) {
+        closestDistance = dist;
+        closestId = id;
+        closestIsHeadshot = true;
+      }
+    }
+
+    for (const offsetY of BODY_SAMPLE_OFFSETS) {
+      const center = { x: player.position.x, y: player.position.y + offsetY, z: player.position.z };
+      const dist = raySphereDistance(origin, direction, center, BODY_HIT_RADIUS);
+      if (dist !== null && dist < closestDistance) {
+        closestDistance = dist;
+        closestId = id;
+        closestIsHeadshot = false;
+      }
     }
   });
 
-  return closestId;
+  return { targetId: closestId, isHeadshot: closestIsHeadshot };
 }
 
 // Diffusé à TOUT le monde (pas juste au joueur concerné) car l'assombrissement
 // du gilet doit être visible par les autres joueurs.
 function broadcastShieldSteps(id, player) {
-  io.emit('player-shield-steps', { id, steps: shieldSteps(player.shield) });
+  io.emit('player-shield-steps', { id, steps: shieldSteps(player) });
 }
 
 function killPlayer(victimId, killerId) {
@@ -265,6 +417,8 @@ function killPlayer(victimId, killerId) {
   victim.hp = 0;
   victim.shield = 0; // le gilet équipé ne survit pas à la mort
   victim.vestCount = 0; // les gilets en réserve non plus
+  // maxVestSlots N'EST PAS réinitialisé : la capacité spéciale reste acquise
+  // pour le reste de la partie, y compris après un respawn.
   broadcastShieldSteps(victimId, victim);
 
   if (killerId) {
@@ -289,7 +443,7 @@ function killPlayer(victimId, killerId) {
     victim.alive = true;
     victim.hp = MAX_HP;
     victim.position = spawn;
-    victim.weapons = ['pistol', null]; // on repart avec juste le pistolet
+    victim.weapons = [{ id: 'pistol', rarity: 'gray' }, null]; // on repart avec juste le pistolet, rareté gris
     victim.vestCount = 0;
     io.to(victimId).emit('you-respawned', { position: spawn });
     io.to(victimId).emit('your-weapons', { weapons: victim.weapons });
@@ -316,7 +470,7 @@ io.on('connection', (socket) => {
       position: p.position,
       rotationY: p.rotationY,
       hp: p.hp,
-      shieldSteps: shieldSteps(p.shield),
+      shieldSteps: shieldSteps(p),
     }));
     socket.emit('current-players', existingPlayers);
 
@@ -340,20 +494,24 @@ io.on('connection', (socket) => {
     socket.emit('current-weapon-pickups', existingWeaponPickups);
 
     // ...puis on l'ajoute et on prévient tout le monde.
-    players.set(socket.id, {
+    const player = {
       pseudo,
       team,
       position: spawn,
       rotationY: 0,
       hp: MAX_HP,
       shield: 0,
-      weapons: ['pistol', null],
+      weapons: [{ id: 'pistol', rarity: 'gray' }, null],
       vestCount: 0,
+      maxVestSlots: MAX_SHIELD_VESTS,
       money: 0,
       alive: true,
-    });
-    socket.emit('your-weapons', { weapons: ['pistol', null] });
+    };
+    players.set(socket.id, player);
+    socket.emit('your-weapons', { weapons: player.weapons });
     socket.emit('your-vest-count', { count: 0 });
+    socket.emit('your-abilities', { maxVestSlots: player.maxVestSlots });
+    socket.emit('your-money', { money: player.money });
 
     socket.broadcast.emit('player-joined', { id: socket.id, pseudo, team, position: spawn });
 
@@ -376,16 +534,24 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('shoot', ({ origin, direction, weaponId } = {}) => {
+  // Le client envoie juste un NUMÉRO DE SLOT (0 = arme 1, 1 = arme 2), jamais
+  // un identifiant d'arme ou des dégâts : le serveur regarde lui-même ce que
+  // ce slot contient dans son propre état (id + rareté) pour calculer la
+  // cadence et les dégâts. Impossible pour un client modifié de prétendre
+  // tirer avec une arme/rareté qu'il ne possède pas vraiment.
+  socket.on('shoot', ({ origin, direction, slot } = {}) => {
     const shooter = players.get(socket.id);
     if (!shooter || !shooter.alive || !origin || !direction) return;
-    if (!shooter.weapons.includes(weaponId)) return; // n'a pas cette arme dans son stuff
+    if (slot !== 0 && slot !== 1) return;
 
-    const weapon = WEAPONS[weaponId] || WEAPONS[DEFAULT_WEAPON_ID];
+    const equipped = shooter.weapons[slot];
+    if (!equipped) return; // rien dans ce slot
+
+    const cooldown = weaponCooldown(equipped.id);
     const now = Date.now();
     // Petite tolérance (20ms) pour la latence réseau, sans quoi une cadence
     // pile-poil correcte côté client se ferait parfois rejeter à tort.
-    if (now - (shooter.lastShotAt || 0) < weapon.cooldown * 1000 - 20) return;
+    if (now - (shooter.lastShotAt || 0) < cooldown * 1000 - 20) return;
     shooter.lastShotAt = now;
 
     const obstacleDistance = nearestObstacleDistance(origin, direction);
@@ -396,11 +562,12 @@ io.on('connection', (socket) => {
       maxLength: Math.min(obstacleDistance, 60),
     });
 
-    const targetId = findClosestHit(socket.id, origin, direction, obstacleDistance);
+    const { targetId, isHeadshot } = findClosestHit(socket.id, origin, direction, obstacleDistance);
     if (!targetId) return;
 
     const target = players.get(targetId);
-    let damage = weapon.damage;
+    let damage = weaponDamage(equipped.id, equipped.rarity);
+    if (isHeadshot) damage = Math.round(damage * HEADSHOT_MULTIPLIER);
     if (target.shield > 0) {
       const absorbed = Math.min(target.shield, damage);
       target.shield -= absorbed;
@@ -410,7 +577,7 @@ io.on('connection', (socket) => {
     }
     target.hp = Math.max(0, target.hp - damage);
     io.to(targetId).emit('your-hp', { hp: target.hp });
-    socket.emit('hit-confirmed', { target: targetId });
+    socket.emit('hit-confirmed', { target: targetId, headshot: isHeadshot });
 
     if (target.hp <= 0) {
       killPlayer(targetId, socket.id);
@@ -439,7 +606,7 @@ io.on('connection', (socket) => {
     const player = players.get(socket.id);
     const vest = vests.get(vestId);
     if (!player || !player.alive || !vest) return;
-    if (player.vestCount >= MAX_SHIELD_VESTS) return; // stuff déjà plein
+    if (player.vestCount >= player.maxVestSlots) return; // stuff déjà plein
 
     const dx = player.position.x - vest.position.x;
     const dy = player.position.y - vest.position.y;
@@ -457,13 +624,17 @@ io.on('connection', (socket) => {
   });
 
   // Activation d'un gilet en réserve (clic droit avec le slot gilets
-  // sélectionné) : consomme 1 gilet du stuff, ajoute au bouclier actif.
+  // sélectionné) : consomme 1 gilet du stuff, ajoute au bouclier actif. Le
+  // plafond du bouclier dépend de maxVestSlots (2, ou 3 si la capacité
+  // spéciale a été achetée) — voir ÉCONOMIE plus haut.
   socket.on('use-vest', () => {
     const player = players.get(socket.id);
     if (!player || !player.alive || player.vestCount <= 0) return;
+    const maxShield = maxShieldFor(player);
+    if (player.shield >= maxShield) return; // bouclier déjà plein, on ne gâche pas le gilet
 
     player.vestCount -= 1;
-    player.shield = Math.min(MAX_SHIELD, player.shield + SHIELD_PER_VEST);
+    player.shield = Math.min(maxShield, player.shield + SHIELD_PER_VEST);
     io.to(socket.id).emit('your-vest-count', { count: player.vestCount });
     io.to(socket.id).emit('your-shield', { shield: player.shield });
     broadcastShieldSteps(socket.id, player);
@@ -474,7 +645,6 @@ io.on('connection', (socket) => {
     const pickup = weaponPickups.get(pickupId);
     if (!player || !player.alive || !pickup) return;
     if (player.weapons[1]) return; // slot 2 déjà occupé, stuff plein pour les armes
-    if (player.weapons.includes(pickup.weaponId)) return; // déjà cette arme
 
     const dx = player.position.x - pickup.position.x;
     const dy = player.position.y - pickup.position.y;
@@ -485,10 +655,25 @@ io.on('connection', (socket) => {
     weaponPickups.delete(pickupId);
     io.emit('weapon-pickup-removed', { id: pickupId });
 
-    player.weapons[1] = pickup.weaponId;
+    // Les armes trouvées au sol sont toujours de rareté "gray" — la rareté
+    // supérieure est réservée à la boutique (voir ÉCONOMIE).
+    player.weapons[1] = { id: pickup.weaponId, rarity: 'gray' };
     io.to(socket.id).emit('your-weapons', { weapons: player.weapons });
 
     setTimeout(() => spawnWeaponPickupAt(pickup.spawnIndex), WEAPON_PICKUP_RESPAWN_MS);
+  });
+
+  // ---------------------------------------------------------------------
+  // ÉCONOMIE — achat en boutique. itemId vient du catalogue défini dans
+  // src/shop.js (ex. "vest", "weapon:rifle:red", "ability-extra-vest-slot").
+  // Aucune donnée de prix/effet n'est envoyée par le client : seul l'id de
+  // l'objet voyage sur le réseau, le serveur retrouve le prix et l'effet
+  // dans son propre catalogue (voir ÉCONOMIE plus haut).
+  // ---------------------------------------------------------------------
+  socket.on('buy-item', ({ itemId } = {}) => {
+    const player = players.get(socket.id);
+    if (!player || !player.alive || typeof itemId !== 'string') return;
+    tryPurchase(socket, player, itemId);
   });
 
   socket.on('disconnect', () => {
