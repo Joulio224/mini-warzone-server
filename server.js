@@ -177,6 +177,19 @@ function tryPurchase(socket, player, itemId) {
 
 const TEAMS = ['red', 'blue'];
 
+// Doit rester identique à EMOJI_FACES dans src/appearance.js — le serveur ne
+// fait confiance à aucune valeur envoyée par le client : couleur hors format
+// ou emoji hors liste retombent silencieusement sur une valeur par défaut.
+const EMOJI_FACES = ['😀', '😎', '😡', '😱', '🤖', '👽', '💀', '🥶', '🤠', '🤡', '😈', '🥵'];
+const DEFAULT_APPEARANCE = { bodyColor: '#8a8f98', face: EMOJI_FACES[0] };
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+
+function sanitizeAppearance(input) {
+  const bodyColor = HEX_COLOR_RE.test(input?.bodyColor) ? input.bodyColor : DEFAULT_APPEARANCE.bodyColor;
+  const face = EMOJI_FACES.includes(input?.face) ? input.face : DEFAULT_APPEARANCE.face;
+  return { bodyColor, face };
+}
+
 // ---------------------------------------------------------------------------
 // Obstacles (murs + balcon + caisses de couverture) : chargés depuis
 // mapData.colliders, plus aucune géométrie codée en dur ici. Le serveur n'a
@@ -371,8 +384,13 @@ function killPlayer(victimId, killerId) {
 }
 
 io.on('connection', (socket) => {
-  socket.on('join', (pseudoInput) => {
+  socket.on('join', (payload) => {
+    // Compat : un vieux client pourrait encore envoyer juste le pseudo en
+    // texte brut plutôt que { pseudo, appearance }.
+    const { pseudo: pseudoInput, appearance: appearanceInput } =
+      typeof payload === 'string' ? { pseudo: payload } : payload || {};
     const pseudo = String(pseudoInput || 'Joueur').slice(0, 20);
+    const appearance = sanitizeAppearance(appearanceInput);
     const team = assignTeam();
     const spawn = pickTeamSpawn(team);
 
@@ -389,6 +407,7 @@ io.on('connection', (socket) => {
       rotationY: p.rotationY,
       hp: p.hp,
       shieldSteps: shieldSteps(p),
+      appearance: p.appearance,
     }));
     socket.emit('current-players', existingPlayers);
 
@@ -409,6 +428,7 @@ io.on('connection', (socket) => {
     const player = {
       pseudo,
       team,
+      appearance,
       position: spawn,
       rotationY: 0,
       hp: MAX_HP,
@@ -425,7 +445,7 @@ io.on('connection', (socket) => {
     socket.emit('your-abilities', { maxVestSlots: player.maxVestSlots });
     socket.emit('your-money', { money: player.money });
 
-    socket.broadcast.emit('player-joined', { id: socket.id, pseudo, team, position: spawn });
+    socket.broadcast.emit('player-joined', { id: socket.id, pseudo, team, position: spawn, appearance });
 
     console.log(
       `[+] ${pseudo} (${socket.id}) — équipe ${team} — ${players.size} joueur(s) connecté(s)`
