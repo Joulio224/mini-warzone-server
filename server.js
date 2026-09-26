@@ -1,45 +1,38 @@
 // ---------------------------------------------------------------------------
 // Serveur temps réel Mini Warzone (Socket.io)
 // ---------------------------------------------------------------------------
-// Rôle : synchroniser les positions des joueurs, les tirs, la vie et le loot
-// au sol entre tous les clients connectés. Ne gère PAS les comptes/amis/
-// groupes (ça, c'est Firebase, côté client) — ce serveur ne connaît que des
-// sockets, des positions, des points de vie... et maintenant de l'argent et
-// des achats (voir la section ÉCONOMIE ci-dessous).
+// Rôle : synchroniser les positions des joueurs, les tirs et la vie entre
+// tous les clients connectés. Ne gère PAS les comptes/amis/groupes (ça,
+// c'est Firebase, côté client) — ce serveur ne connaît que des sockets, des
+// positions, des points de vie... et maintenant de l'argent et des achats
+// (voir la section ÉCONOMIE ci-dessous).
 //
 // En dev : lance ce serveur séparément du client (`npm run dev` ici, dans un
 // 2e terminal), pendant que le client tourne sur http://localhost:5173.
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+
+// Toutes les données de la map (collisions, spawns d'équipe, points
+// d'apparition des armes/gilets, lumières d'ambiance) viennent de ce fichier
+// — plus aucune géométrie de salle codée en dur ici. Doit rester identique
+// à src/map-data.json côté client. La géométrie VISIBLE, elle, vient de
+// map.glb (voir src/main.js) — ce fichier ne contient que ce que le rendu
+// 3D ne peut pas déduire tout seul (boîtes de collision, points de jeu).
+const mapData = JSON.parse(readFileSync(new URL('./map-data.json', import.meta.url)));
 
 const PORT = process.env.PORT || 3001;
 
 const MAX_HP = 100;
-const BODY_HIT_RADIUS = 0.35; // calé sur le rayon réel de la capsule visuelle du joueur
-const HEAD_HIT_RADIUS = 0.25; // calé sur le rayon réel de la sphère "tête" du modèle
-const HEADSHOT_MULTIPLIER = 2;
+const HIT_RADIUS = 0.35; // calé sur le rayon réel de la capsule visuelle du joueur
 // Hauteurs testées le long du corps (relatives à position.y, qui est la
 // hauteur des yeux) — une approximation simple d'une capsule verticale, sans
-// faire de vraie géométrie de capsule côté serveur.
-const BODY_SAMPLE_OFFSETS = [-1.6, -1.1, -0.6]; // pieds -> torse (s'arrête avant la tête, zone séparée ci-dessous)
-// Un seul point, calé exactement sur le centre de la sphère "tête" du modèle
-// visuel (voir createPlayerMesh dans main.js : sphère rayon 0.25 à y=1.65
-// dans le groupe local, dont l'origine est position.y - EYE_HEIGHT(1.7)).
-const HEAD_SAMPLE_OFFSETS = [-0.05];
-const HEAL_AMOUNT = 30;
-const LOOT_COLLECT_RADIUS = 1.8;
+// faire de vraie géométrie de capsule côté serveur. Remplace l'ancienne
+// sphère unique et bien trop large (0.9) qui faisait toucher quelqu'un même
+// en visant à côté de lui.
+const BODY_SAMPLE_OFFSETS = [-1.6, -1.1, -0.6, -0.1, 0.15]; // pieds -> tête
 const RESPAWN_DELAY_MS = 3000;
-
-// Dimensions de la salle (avec balcon) — doivent rester identiques à
-// src/main.js. Définies ici, tout en haut, car WEAPON_PICKUP_POINTS
-// ci-dessous a besoin de BALCONY_HEIGHT pour placer l'arme sur le balcon.
-const ROOM_HALF_WIDTH = 20;
-const ROOM_HALF_DEPTH = 14;
-const WALL_HEIGHT = 5;
-const WALL_THICKNESS = 0.6;
-const BALCONY_HEIGHT = 3.2;
-const BALCONY_THICKNESS = 0.3;
 
 // Bouclier (gilets pare-balle) : le "stuff" contient des gilets en réserve
 // (ramassés au sol ou achetés en boutique), chacun ajouté au bouclier actif
@@ -55,14 +48,10 @@ const VEST_RESPAWN_MS = 25000;
 
 // Armes ramassables au sol : le slot 0 est toujours le pistolet de départ
 // (jamais perdu), le slot 1 se remplit en ramassant une arme au sol — un
-// point de spawn fixe par arme, jamais aléatoire. Les armes trouvées au sol
-// sont toujours de rareté "gray" (la rareté supérieure ne s'obtient qu'en
-// boutique, voir ÉCONOMIE).
-const WEAPON_PICKUP_POINTS = [
-  { weaponId: 'smg', x: -6, y: 1, z: 0 },
-  { weaponId: 'rifle', x: 6, y: 1, z: 0 },
-  { weaponId: 'rifle', x: 0, y: BALCONY_HEIGHT + 0.6, z: 11 }, // sur le balcon
-];
+// point de spawn fixe par arme (voir mapData.weaponPickups), jamais
+// aléatoire. Les armes trouvées au sol sont toujours de rareté "gray" (la
+// rareté supérieure ne s'obtient qu'en boutique, voir ÉCONOMIE).
+const WEAPON_PICKUP_POINTS = mapData.weaponPickups;
 const WEAPON_PICKUP_COLLECT_RADIUS = 1.8;
 const WEAPON_PICKUP_RESPAWN_MS = 30000;
 
@@ -189,53 +178,14 @@ function tryPurchase(socket, player, itemId) {
 const TEAMS = ['red', 'blue'];
 
 // ---------------------------------------------------------------------------
-// Géométrie des obstacles (murs + balcon + caisses de couverture), copiée
-// exactement des dimensions de buildCustomRoom() dans src/main.js. Le
-// serveur n'a pas de moteur 3D : on stocke juste ces boîtes pour empêcher
-// les tirs de traverser murs/balcon/caisses. Si tu changes la salle côté
-// client, mets ça à jour pareil. (ROOM_HALF_WIDTH etc. sont définies tout en
-// haut du fichier, voir plus haut.)
-function wallBox(centerX, centerZ, width, depth) {
-  return {
-    minX: centerX - width / 2, maxX: centerX + width / 2,
-    minY: 0, maxY: WALL_HEIGHT,
-    minZ: centerZ - depth / 2, maxZ: centerZ + depth / 2,
-  };
-}
-function coverBox(centerX, centerZ, width, depth, height) {
-  return {
-    minX: centerX - width / 2, maxX: centerX + width / 2,
-    minY: 0, maxY: height,
-    minZ: centerZ - depth / 2, maxZ: centerZ + depth / 2,
-  };
-}
-
-const fullWidth = ROOM_HALF_WIDTH * 2 + WALL_THICKNESS * 2;
-const fullDepth = ROOM_HALF_DEPTH * 2;
-const balconyWidth = ROOM_HALF_WIDTH * 2 - 6;
-const balconyDepth = 6;
-const OBSTACLES = [
-  wallBox(0, -ROOM_HALF_DEPTH, fullWidth, WALL_THICKNESS), // sud
-  wallBox(0, ROOM_HALF_DEPTH, fullWidth, WALL_THICKNESS), // nord
-  wallBox(-ROOM_HALF_WIDTH, 0, WALL_THICKNESS, fullDepth), // ouest
-  wallBox(ROOM_HALF_WIDTH, 0, WALL_THICKNESS, fullDepth), // est
-  {
-    // Sol du balcon : ne bloque un tir qu'à sa hauteur (autour de
-    // BALCONY_HEIGHT), pas les tirs à hauteur normale en dessous.
-    minX: -balconyWidth / 2, maxX: balconyWidth / 2,
-    minY: BALCONY_HEIGHT - BALCONY_THICKNESS / 2, maxY: BALCONY_HEIGHT + BALCONY_THICKNESS / 2,
-    minZ: ROOM_HALF_DEPTH - balconyDepth, maxZ: ROOM_HALF_DEPTH,
-  },
-  coverBox(-6, -4, 2, 2, 1.6),
-  coverBox(-6, 4, 2, 2, 1.6),
-  coverBox(0, -6, 3, 1.2, 1.6),
-  coverBox(0, 6, 3, 1.2, 1.6),
-  coverBox(6, -4, 2, 2, 1.6),
-  coverBox(6, 4, 2, 2, 1.6),
-  coverBox(-2.5, 0, 1.5, 1.5, 1.6),
-  coverBox(2.5, 0, 1.5, 1.5, 1.6),
-  coverBox(0, 0, 2.3, 1.1, 1.0), // table de la boutique, au centre
-];
+// Obstacles (murs + balcon + caisses de couverture) : chargés depuis
+// mapData.colliders, plus aucune géométrie codée en dur ici. Le serveur n'a
+// pas de moteur 3D — juste ces boîtes, au format {minX,maxX,minY,maxY,minZ,
+// maxZ}, pour empêcher les tirs de traverser murs/balcon/caisses. Le type
+// "floor" (sol du balcon) ne bloque un tir qu'à sa hauteur ; les murs/caisses
+// (type "wall") bloquent sur toute leur hauteur — voir rayBoxDistance juste
+// en dessous, qui traite les deux de la même façon (un simple test de boîte).
+const OBSTACLES = mapData.colliders;
 
 // Distance d'intersection rayon/boîte (test des "tranches" standard). Rend
 // null si le rayon ne touche pas la boîte, sinon la distance du premier point
@@ -274,22 +224,10 @@ function nearestObstacleDistance(origin, direction) {
   return nearest;
 }
 
-// Correspond à la salle construite côté client (buildCustomRoom dans
-// src/main.js) : équipe rouge à l'ouest (x négatif), équipe bleue à l'est
-// (x positif). Si tu changes la taille de la salle côté client, ajuste ces
-// coordonnées en conséquence.
-const TEAM_SPAWN_POINTS = {
-  red: [
-    { x: -15, y: 1.7, z: -8 },
-    { x: -15, y: 1.7, z: 0 },
-    { x: -15, y: 1.7, z: 6 },
-  ],
-  blue: [
-    { x: 15, y: 1.7, z: -8 },
-    { x: 15, y: 1.7, z: 0 },
-    { x: 15, y: 1.7, z: 6 },
-  ],
-};
+// Équipe rouge à l'ouest (x négatif), équipe bleue à l'est (x positif) —
+// coordonnées définies dans mapData.teamSpawns (à ajuster là-bas si la
+// taille de la salle change côté client).
+const TEAM_SPAWN_POINTS = mapData.teamSpawns;
 
 function pickTeamSpawn(team) {
   const points = TEAM_SPAWN_POINTS[team] || TEAM_SPAWN_POINTS[TEAMS[0]];
@@ -325,15 +263,9 @@ const io = new Server(httpServer, {
 //                maxVestSlots, money, alive }
 const players = new Map();
 
-// lootId -> { position: {x,y,z} }
-const loot = new Map();
-
-// Gilets pare-balle : contrairement au loot (qui tombe des joueurs tués),
-// ils réapparaissent tout seuls à des emplacements fixes, après un délai.
-const VEST_SPAWN_POINTS = [
-  { x: -2.5, y: 1, z: 3 },
-  { x: 2.5, y: 1, z: -3 },
-];
+// Gilets pare-balle : réapparaissent tout seuls à des emplacements fixes
+// (mapData.vestSpawns), après un délai.
+const VEST_SPAWN_POINTS = mapData.vestSpawns;
 const vests = new Map(); // vestId -> { position, spawnIndex }
 
 function spawnVestAt(spawnIndex) {
@@ -374,33 +306,24 @@ function raySphereDistance(origin, dir, center, radius) {
 function findClosestHit(shooterId, origin, direction, maxDistance) {
   let closestId = null;
   let closestDistance = maxDistance;
-  let closestIsHeadshot = false;
 
   players.forEach((player, id) => {
     if (id === shooterId || !player.alive) return;
-
-    for (const offsetY of HEAD_SAMPLE_OFFSETS) {
-      const center = { x: player.position.x, y: player.position.y + offsetY, z: player.position.z };
-      const dist = raySphereDistance(origin, direction, center, HEAD_HIT_RADIUS);
-      if (dist !== null && dist < closestDistance) {
-        closestDistance = dist;
-        closestId = id;
-        closestIsHeadshot = true;
-      }
-    }
-
     for (const offsetY of BODY_SAMPLE_OFFSETS) {
-      const center = { x: player.position.x, y: player.position.y + offsetY, z: player.position.z };
-      const dist = raySphereDistance(origin, direction, center, BODY_HIT_RADIUS);
+      const center = {
+        x: player.position.x,
+        y: player.position.y + offsetY,
+        z: player.position.z,
+      };
+      const dist = raySphereDistance(origin, direction, center, HIT_RADIUS);
       if (dist !== null && dist < closestDistance) {
         closestDistance = dist;
         closestId = id;
-        closestIsHeadshot = false;
       }
     }
   });
 
-  return { targetId: closestId, isHeadshot: closestIsHeadshot };
+  return closestId;
 }
 
 // Diffusé à TOUT le monde (pas juste au joueur concerné) car l'assombrissement
@@ -431,11 +354,6 @@ function killPlayer(victimId, killerId) {
 
   io.emit('player-died', { id: victimId, killedBy: killerId || null });
   io.to(victimId).emit('you-died');
-
-  // Le stuff du joueur tombe au sol, à ramasser par n'importe qui.
-  const lootId = randomUUID();
-  loot.set(lootId, { position: { ...victim.position } });
-  io.emit('loot-spawned', { id: lootId, position: victim.position });
 
   setTimeout(() => {
     if (!players.has(victimId)) return; // parti entre-temps
@@ -473,12 +391,6 @@ io.on('connection', (socket) => {
       shieldSteps: shieldSteps(p),
     }));
     socket.emit('current-players', existingPlayers);
-
-    const existingLoot = Array.from(loot.entries()).map(([id, l]) => ({
-      id,
-      position: l.position,
-    }));
-    socket.emit('current-loot', existingLoot);
 
     const existingVests = Array.from(vests.entries()).map(([id, v]) => ({
       id,
@@ -562,12 +474,11 @@ io.on('connection', (socket) => {
       maxLength: Math.min(obstacleDistance, 60),
     });
 
-    const { targetId, isHeadshot } = findClosestHit(socket.id, origin, direction, obstacleDistance);
+    const targetId = findClosestHit(socket.id, origin, direction, obstacleDistance);
     if (!targetId) return;
 
     const target = players.get(targetId);
     let damage = weaponDamage(equipped.id, equipped.rarity);
-    if (isHeadshot) damage = Math.round(damage * HEADSHOT_MULTIPLIER);
     if (target.shield > 0) {
       const absorbed = Math.min(target.shield, damage);
       target.shield -= absorbed;
@@ -577,29 +488,11 @@ io.on('connection', (socket) => {
     }
     target.hp = Math.max(0, target.hp - damage);
     io.to(targetId).emit('your-hp', { hp: target.hp });
-    socket.emit('hit-confirmed', { target: targetId, headshot: isHeadshot });
+    socket.emit('hit-confirmed', { target: targetId });
 
     if (target.hp <= 0) {
       killPlayer(targetId, socket.id);
     }
-  });
-
-  socket.on('collect-loot', ({ lootId } = {}) => {
-    const player = players.get(socket.id);
-    const item = loot.get(lootId);
-    if (!player || !player.alive || !item) return;
-
-    const dx = player.position.x - item.position.x;
-    const dy = player.position.y - item.position.y;
-    const dz = player.position.z - item.position.z;
-    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (distance > LOOT_COLLECT_RADIUS) return;
-
-    loot.delete(lootId);
-    io.emit('loot-removed', { id: lootId });
-
-    player.hp = Math.min(MAX_HP, player.hp + HEAL_AMOUNT);
-    io.to(socket.id).emit('your-hp', { hp: player.hp });
   });
 
   socket.on('collect-vest', ({ vestId } = {}) => {
