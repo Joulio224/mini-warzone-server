@@ -1,0 +1,209 @@
+{
+  "colliders": [
+    {
+      "type": "wall",
+      "minX": -20.6,
+      "maxX": 20.6,
+      "minY": 0,
+      "maxY": 5,
+      "minZ": -14.3,
+      "maxZ": -13.7
+    },
+    {
+      "type": "wall",
+      "minX": -20.6,
+      "maxX": 20.6,
+      "minY": 0,
+      "maxY": 5,
+      "minZ": 13.7,
+      "maxZ": 14.3
+    },
+    {
+      "type": "wall",
+      "minX": -20.3,
+      "maxX": -19.7,
+      "minY": 0,
+      "maxY": 5,
+      "minZ": -14.0,
+      "maxZ": 14.0
+    },
+    {
+      "type": "wall",
+      "minX": 19.7,
+      "maxX": 20.3,
+      "minY": 0,
+      "maxY": 5,
+      "minZ": -14.0,
+      "maxZ": 14.0
+    },
+    {
+      "type": "floor",
+      "minX": -17.0,
+      "maxX": 17.0,
+      "minY": 3.0500000000000003,
+      "maxY": 3.35,
+      "minZ": 8,
+      "maxZ": 14
+    },
+    {
+      "type": "wall",
+      "minX": -7.0,
+      "maxX": -5.0,
+      "minY": 0,
+      "maxY": 1.6,
+      "minZ": -5.0,
+      "maxZ": -3.0
+    },
+    {
+      "type": "wall",
+      "minX": -7.0,
+      "maxX": -5.0,
+      "minY": 0,
+      "maxY": 1.6,
+      "minZ": 3.0,
+      "maxZ": 5.0
+    },
+    {
+      "type": "wall",
+      "minX": -1.5,
+      "maxX": 1.5,
+      "minY": 0,
+      "maxY": 1.6,
+      "minZ": -6.6,
+      "maxZ": -5.4
+    },
+    {
+      "type": "wall",
+      "minX": -1.5,
+      "maxX": 1.5,
+      "minY": 0,
+      "maxY": 1.6,
+      "minZ": 5.4,
+      "maxZ": 6.6
+    },
+    {
+      "type": "wall",
+      "minX": 5.0,
+      "maxX": 7.0,
+      "minY": 0,
+      "maxY": 1.6,
+      "minZ": -5.0,
+      "maxZ": -3.0
+    },
+    {
+      "type": "wall",
+      "minX": 5.0,
+      "maxX": 7.0,
+      "minY": 0,
+      "maxY": 1.6,
+      "minZ": 3.0,
+      "maxZ": 5.0
+    },
+    {
+      "type": "wall",
+      "minX": -3.25,
+      "maxX": -1.75,
+      "minY": 0,
+      "maxY": 1.6,
+      "minZ": -0.75,
+      "maxZ": 0.75
+    },
+    {
+      "type": "wall",
+      "minX": 1.75,
+      "maxX": 3.25,
+      "minY": 0,
+      "maxY": 1.6,
+      "minZ": -0.75,
+      "maxZ": 0.75
+    }
+  ],
+  "teamSpawns": {
+    "red": [
+      {
+        "x": -15,
+        "y": 1.7,
+        "z": -8
+      },
+      {
+        "x": -15,
+        "y": 1.7,
+        "z": 0
+      },
+      {
+        "x": -15,
+        "y": 1.7,
+        "z": 6
+      }
+    ],
+    "blue": [
+      {
+        "x": 15,
+        "y": 1.7,
+        "z": -8
+      },
+      {
+        "x": 15,
+        "y": 1.7,
+        "z": 0
+      },
+      {
+        "x": 15,
+        "y": 1.7,
+        "z": 6
+      }
+    ]
+  },
+  "weaponPickups": [
+    {
+      "weaponId": "smg",
+      "x": -6,
+      "y": 1,
+      "z": 0
+    },
+    {
+      "weaponId": "rifle",
+      "x": 6,
+      "y": 1,
+      "z": 0
+    },
+    {
+      "weaponId": "rifle",
+      "x": 0,
+      "y": 3.8000000000000003,
+      "z": 11
+    }
+  ],
+  "vestSpawns": [
+    {
+      "x": -2.5,
+      "y": 1,
+      "z": 3
+    },
+    {
+      "x": 2.5,
+      "y": 1,
+      "z": -3
+    }
+  ],
+  "lights": [
+    {
+      "color": "#ff4d4d",
+      "intensity": 6,
+      "distance": 12,
+      "decay": 2,
+      "x": -18,
+      "y": 3,
+      "z": 0
+    },
+    {
+      "color": "#4d94ff",
+      "intensity": 6,
+      "distance": 12,
+      "decay": 2,
+      "x": 18,
+      "y": 3,
+      "z": 0
+    }
+  ]
+}

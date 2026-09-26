@@ -190,6 +190,16 @@ function sanitizeAppearance(input) {
   return { bodyColor, face };
 }
 
+// Identifiant du groupe Firestore (voir src/groups.js côté client) auquel le
+// joueur appartient, s'il en a un — sert uniquement à équilibrer les équipes
+// et les spawns (voir assignTeam / pickTeamSpawn), jamais interprété comme
+// un chemin ou une requête.
+function sanitizeGroupId(input) {
+  if (typeof input !== 'string') return null;
+  const trimmed = input.trim().slice(0, 200);
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 // ---------------------------------------------------------------------------
 // Obstacles (murs + balcon + caisses de couverture) : chargés depuis
 // mapData.colliders, plus aucune géométrie codée en dur ici. Le serveur n'a
@@ -242,14 +252,43 @@ function nearestObstacleDistance(origin, direction) {
 // taille de la salle change côté client).
 const TEAM_SPAWN_POINTS = mapData.teamSpawns;
 
-function pickTeamSpawn(team) {
+// Renvoie { position, spawnIndex }. Si un coéquipier du même groupe (voir
+// groupId, envoyé par le client à la connexion — cf. src/groups.js côté
+// client) est déjà posté sur cette équipe, on réutilise SON point de spawn
+// (avec un petit décalage pour ne pas apparaître littéralement l'un dans
+// l'autre) plutôt qu'un tirage au hasard : c'est ce qui permet à un groupe
+// d'amis d'atterrir vraiment ensemble plutôt qu'à trois coins différents.
+function pickTeamSpawn(team, groupId) {
   const points = TEAM_SPAWN_POINTS[team] || TEAM_SPAWN_POINTS[TEAMS[0]];
-  return { ...points[Math.floor(Math.random() * points.length)] };
+
+  if (groupId) {
+    const groupmates = Array.from(players.values()).filter(
+      (p) => p.groupId === groupId && p.team === team && Number.isInteger(p.spawnIndex)
+    );
+    if (groupmates.length > 0) {
+      const spawnIndex = groupmates[0].spawnIndex;
+      const base = points[spawnIndex] || points[0];
+      const offset = groupmates.length * 0.8; // évite la superposition exacte
+      return {
+        position: { x: base.x + offset, y: base.y, z: base.z + offset },
+        spawnIndex,
+      };
+    }
+  }
+
+  const spawnIndex = Math.floor(Math.random() * points.length);
+  return { position: { ...points[spawnIndex] }, spawnIndex };
 }
 
-// Équilibrage simple : le nouveau joueur rejoint l'équipe la moins nombreuse
-// (égalité → équipe rouge).
-function assignTeam() {
+// Équilibrage : le nouveau joueur rejoint l'équipe la moins nombreuse (égalité
+// → équipe rouge). Exception : s'il a un groupId et qu'un membre de ce même
+// groupe est déjà en jeu, on le met avec lui — jouer ensemble passe avant
+// l'équilibrage strict des effectifs.
+function assignTeam(groupId) {
+  if (groupId) {
+    const groupmate = Array.from(players.values()).find((p) => p.groupId === groupId);
+    if (groupmate) return groupmate.team;
+  }
   const counts = { red: 0, blue: 0 };
   players.forEach((p) => {
     counts[p.team] = (counts[p.team] || 0) + 1;
@@ -370,10 +409,11 @@ function killPlayer(victimId, killerId) {
 
   setTimeout(() => {
     if (!players.has(victimId)) return; // parti entre-temps
-    const spawn = pickTeamSpawn(victim.team);
+    const { position: spawn, spawnIndex } = pickTeamSpawn(victim.team, victim.groupId);
     victim.alive = true;
     victim.hp = MAX_HP;
     victim.position = spawn;
+    victim.spawnIndex = spawnIndex;
     victim.weapons = [{ id: 'pistol', rarity: 'gray' }, null]; // on repart avec juste le pistolet, rareté gris
     victim.vestCount = 0;
     io.to(victimId).emit('you-respawned', { position: spawn });
@@ -387,12 +427,13 @@ io.on('connection', (socket) => {
   socket.on('join', (payload) => {
     // Compat : un vieux client pourrait encore envoyer juste le pseudo en
     // texte brut plutôt que { pseudo, appearance }.
-    const { pseudo: pseudoInput, appearance: appearanceInput } =
+    const { pseudo: pseudoInput, appearance: appearanceInput, groupId: groupIdInput } =
       typeof payload === 'string' ? { pseudo: payload } : payload || {};
     const pseudo = String(pseudoInput || 'Joueur').slice(0, 20);
     const appearance = sanitizeAppearance(appearanceInput);
-    const team = assignTeam();
-    const spawn = pickTeamSpawn(team);
+    const groupId = sanitizeGroupId(groupIdInput);
+    const team = assignTeam(groupId);
+    const { position: spawn, spawnIndex } = pickTeamSpawn(team, groupId);
 
     // On dit au nouveau venu quelle équipe/quel point de spawn est le sien...
     socket.emit('team-assigned', { team, spawn });
@@ -428,6 +469,8 @@ io.on('connection', (socket) => {
     const player = {
       pseudo,
       team,
+      groupId,
+      spawnIndex,
       appearance,
       position: spawn,
       rotationY: 0,
