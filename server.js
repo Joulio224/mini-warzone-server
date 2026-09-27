@@ -630,11 +630,15 @@ io.on('connection', (socket) => {
     broadcastShieldSteps(socket.id, player);
   });
 
-  socket.on('collect-weapon', ({ pickupId } = {}) => {
+  // `slot` (0 ou 1, le slot sélectionné côté client au moment du ramassage)
+  // ne sert que si le stuff est déjà plein — voir plus bas. Comme pour
+  // 'shoot', le client ne peut choisir QUE lequel de ses propres slots se
+  // fait remplacer ; il ne peut ni inventer une arme ni éviter d'en perdre
+  // une, donc pas besoin de s'en méfier davantage.
+  socket.on('collect-weapon', ({ pickupId, slot } = {}) => {
     const player = players.get(socket.id);
     const pickup = weaponPickups.get(pickupId);
     if (!player || !player.alive || !pickup) return;
-    if (player.weapons[1]) return; // slot 2 déjà occupé, stuff plein pour les armes
 
     const dx = player.position.x - pickup.position.x;
     const dy = player.position.y - pickup.position.y;
@@ -646,8 +650,13 @@ io.on('connection', (socket) => {
     io.emit('weapon-pickup-removed', { id: pickupId });
 
     // Les armes trouvées au sol sont toujours de rareté "gray" — la rareté
-    // supérieure est réservée à la boutique (voir ÉCONOMIE).
-    player.weapons[1] = { id: pickup.weaponId, rarity: 'gray' };
+    // supérieure est réservée à la boutique (voir ÉCONOMIE). S'il reste un
+    // slot vide (le 1, puisque le 0 démarre toujours avec le pistolet), elle
+    // le remplit ; sinon (stuff plein) elle remplace l'arme du slot que le
+    // joueur avait sélectionné au ramassage — y compris le pistolet du
+    // slot 0, qui n'est donc plus protégé contre un ramassage au sol.
+    const targetSlot = player.weapons[1] ? (slot === 0 || slot === 1 ? slot : 0) : 1;
+    player.weapons[targetSlot] = { id: pickup.weaponId, rarity: 'gray' };
     io.to(socket.id).emit('your-weapons', { weapons: player.weapons });
 
     scheduleRespawn(() => spawnWeaponPickupAt(pickup.spawnIndex), WEAPON_PICKUP_RESPAWN_MS);
