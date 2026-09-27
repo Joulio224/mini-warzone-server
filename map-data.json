@@ -2,208 +2,3907 @@
   "colliders": [
     {
       "type": "wall",
-      "minX": -20.6,
-      "maxX": 20.6,
-      "minY": 0,
-      "maxY": 5,
-      "minZ": -14.3,
-      "maxZ": -13.7
+      "minX": -40.08,
+      "maxX": -40.08,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": -20.07,
+      "maxZ": -0.07
     },
     {
       "type": "wall",
-      "minX": -20.6,
-      "maxX": 20.6,
-      "minY": 0,
-      "maxY": 5,
-      "minZ": 13.7,
-      "maxZ": 14.3
+      "minX": -40.08,
+      "maxX": -40.08,
+      "minY": 0.0,
+      "maxY": 5.0,
+      "minZ": -20.07,
+      "maxZ": 19.93
     },
     {
       "type": "wall",
-      "minX": -20.3,
-      "maxX": -19.7,
-      "minY": 0,
-      "maxY": 5,
-      "minZ": -14.0,
-      "maxZ": 14.0
+      "minX": -40.08,
+      "maxX": -40.08,
+      "minY": 5.0,
+      "maxY": 10.0,
+      "minZ": -20.07,
+      "maxZ": 19.93
     },
     {
       "type": "wall",
-      "minX": 19.7,
-      "maxX": 20.3,
-      "minY": 0,
-      "maxY": 5,
-      "minZ": -14.0,
-      "maxZ": 14.0
-    },
-    {
-      "type": "floor",
-      "minX": -17.0,
-      "maxX": 17.0,
-      "minY": 3.0500000000000003,
-      "maxY": 3.35,
-      "minZ": 8,
-      "maxZ": 14
+      "minX": -40.08,
+      "maxX": -40.08,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": -0.07,
+      "maxZ": 19.93
     },
     {
       "type": "wall",
-      "minX": -7.0,
-      "maxX": -5.0,
-      "minY": 0,
-      "maxY": 1.6,
-      "minZ": -5.0,
-      "maxZ": -3.0
+      "minX": -40.08,
+      "maxX": -0.08,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": -20.07,
+      "maxZ": -20.07
     },
     {
       "type": "wall",
-      "minX": -7.0,
-      "maxX": -5.0,
-      "minY": 0,
-      "maxY": 1.6,
-      "minZ": 3.0,
-      "maxZ": 5.0
+      "minX": -40.08,
+      "maxX": -0.08,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": 19.93,
+      "maxZ": 19.93
     },
     {
       "type": "wall",
-      "minX": -1.5,
-      "maxX": 1.5,
-      "minY": 0,
-      "maxY": 1.6,
-      "minZ": -6.6,
-      "maxZ": -5.4
+      "minX": -40.08,
+      "maxX": 39.92,
+      "minY": 0.0,
+      "maxY": 5.0,
+      "minZ": -20.07,
+      "maxZ": -20.07
     },
     {
       "type": "wall",
-      "minX": -1.5,
-      "maxX": 1.5,
-      "minY": 0,
-      "maxY": 1.6,
-      "minZ": 5.4,
-      "maxZ": 6.6
+      "minX": -40.08,
+      "maxX": 39.92,
+      "minY": 5.0,
+      "maxY": 10.0,
+      "minZ": -20.07,
+      "maxZ": -20.07
     },
     {
       "type": "wall",
-      "minX": 5.0,
-      "maxX": 7.0,
-      "minY": 0,
-      "maxY": 1.6,
-      "minZ": -5.0,
-      "maxZ": -3.0
+      "minX": -40.08,
+      "maxX": 39.92,
+      "minY": 0.0,
+      "maxY": 5.0,
+      "minZ": 19.93,
+      "maxZ": 19.93
     },
     {
       "type": "wall",
-      "minX": 5.0,
-      "maxX": 7.0,
-      "minY": 0,
-      "maxY": 1.6,
-      "minZ": 3.0,
-      "maxZ": 5.0
+      "minX": -40.08,
+      "maxX": 39.92,
+      "minY": 5.0,
+      "maxY": 10.0,
+      "minZ": 19.93,
+      "maxZ": 19.93
     },
     {
       "type": "wall",
-      "minX": -3.25,
-      "maxX": -1.75,
-      "minY": 0,
-      "maxY": 1.6,
-      "minZ": -0.75,
-      "maxZ": 0.75
+      "minX": -39.08,
+      "maxX": -39.08,
+      "minY": 0.0,
+      "maxY": 1.0,
+      "minZ": -19.07,
+      "maxZ": -0.07
     },
     {
       "type": "wall",
-      "minX": 1.75,
-      "maxX": 3.25,
-      "minY": 0,
-      "maxY": 1.6,
-      "minZ": -0.75,
-      "maxZ": 0.75
+      "minX": -39.08,
+      "maxX": -39.08,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": -19.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": -39.08,
+      "minY": 0.0,
+      "maxY": 0.5,
+      "minZ": -19.07,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": -39.08,
+      "minY": 0.0,
+      "maxY": 5.0,
+      "minZ": -19.07,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": -39.08,
+      "minY": 0.5,
+      "maxY": 1.0,
+      "minZ": -19.07,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": -39.08,
+      "minY": 5.0,
+      "maxY": 10.0,
+      "minZ": -19.07,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": -39.08,
+      "minY": 0.0,
+      "maxY": 1.0,
+      "minZ": -0.07,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": -39.08,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": -0.07,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": -0.08,
+      "minY": 0.0,
+      "maxY": 1.0,
+      "minZ": -19.07,
+      "maxZ": -19.07
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": -0.08,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": -19.07,
+      "maxZ": -19.07
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": -0.08,
+      "minY": 0.0,
+      "maxY": 1.0,
+      "minZ": 18.93,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": -0.08,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": 18.93,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": 38.92,
+      "minY": 0.0,
+      "maxY": 0.5,
+      "minZ": -19.07,
+      "maxZ": -19.07
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": 38.92,
+      "minY": 0.0,
+      "maxY": 5.0,
+      "minZ": -19.07,
+      "maxZ": -19.07
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": 38.92,
+      "minY": 0.5,
+      "maxY": 1.0,
+      "minZ": -19.07,
+      "maxZ": -19.07
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": 38.92,
+      "minY": 5.0,
+      "maxY": 10.0,
+      "minZ": -19.07,
+      "maxZ": -19.07
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": 38.92,
+      "minY": 0.0,
+      "maxY": 0.5,
+      "minZ": 18.93,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": 38.92,
+      "minY": 0.0,
+      "maxY": 5.0,
+      "minZ": 18.93,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": 38.92,
+      "minY": 0.5,
+      "maxY": 1.0,
+      "minZ": 18.93,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": -39.08,
+      "maxX": 38.92,
+      "minY": 5.0,
+      "maxY": 10.0,
+      "minZ": 18.93,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": -35.08,
+      "maxX": -35.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -2.07,
+      "maxZ": 0.43
+    },
+    {
+      "type": "wall",
+      "minX": -35.08,
+      "maxX": -35.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -2.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -35.08,
+      "maxX": -35.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -2.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -35.08,
+      "maxX": -35.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 0.43,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -35.08,
+      "maxX": -32.58,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -2.07,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": -35.08,
+      "maxX": -32.58,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 2.93,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -35.08,
+      "maxX": -30.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -2.07,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": -35.08,
+      "maxX": -30.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -2.07,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": -35.08,
+      "maxX": -30.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 2.93,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -35.08,
+      "maxX": -30.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 2.93,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -32.58,
+      "maxX": -30.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -2.07,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": -32.58,
+      "maxX": -30.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 2.93,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -32.08,
+      "maxX": -32.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 11.93,
+      "maxZ": 13.93
+    },
+    {
+      "type": "wall",
+      "minX": -32.08,
+      "maxX": -32.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 11.93,
+      "maxZ": 15.93
+    },
+    {
+      "type": "wall",
+      "minX": -32.08,
+      "maxX": -32.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 11.93,
+      "maxZ": 15.93
+    },
+    {
+      "type": "wall",
+      "minX": -32.08,
+      "maxX": -32.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 13.93,
+      "maxZ": 15.93
+    },
+    {
+      "type": "wall",
+      "minX": -32.08,
+      "maxX": -30.58,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 11.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": -32.08,
+      "maxX": -30.58,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 15.93,
+      "maxZ": 15.93
+    },
+    {
+      "type": "wall",
+      "minX": -32.08,
+      "maxX": -29.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 11.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": -32.08,
+      "maxX": -29.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 11.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": -32.08,
+      "maxX": -29.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 15.93,
+      "maxZ": 15.93
+    },
+    {
+      "type": "wall",
+      "minX": -32.08,
+      "maxX": -29.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 15.93,
+      "maxZ": 15.93
+    },
+    {
+      "type": "wall",
+      "minX": -31.08,
+      "maxX": -31.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -15.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": -31.08,
+      "maxX": -31.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -15.07,
+      "maxZ": -9.07
+    },
+    {
+      "type": "wall",
+      "minX": -31.08,
+      "maxX": -31.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -15.07,
+      "maxZ": -9.07
+    },
+    {
+      "type": "wall",
+      "minX": -31.08,
+      "maxX": -31.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -9.07
+    },
+    {
+      "type": "wall",
+      "minX": -31.08,
+      "maxX": -29.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -15.07,
+      "maxZ": -15.07
+    },
+    {
+      "type": "wall",
+      "minX": -31.08,
+      "maxX": -29.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -9.07,
+      "maxZ": -9.07
+    },
+    {
+      "type": "wall",
+      "minX": -31.08,
+      "maxX": -27.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -15.07,
+      "maxZ": -15.07
+    },
+    {
+      "type": "wall",
+      "minX": -31.08,
+      "maxX": -27.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -15.07,
+      "maxZ": -15.07
+    },
+    {
+      "type": "wall",
+      "minX": -31.08,
+      "maxX": -27.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -9.07,
+      "maxZ": -9.07
+    },
+    {
+      "type": "wall",
+      "minX": -31.08,
+      "maxX": -27.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -9.07,
+      "maxZ": -9.07
+    },
+    {
+      "type": "wall",
+      "minX": -30.58,
+      "maxX": -29.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 11.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": -30.58,
+      "maxX": -29.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 15.93,
+      "maxZ": 15.93
+    },
+    {
+      "type": "wall",
+      "minX": -30.08,
+      "maxX": -30.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -2.07,
+      "maxZ": 0.43
+    },
+    {
+      "type": "wall",
+      "minX": -30.08,
+      "maxX": -30.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -2.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -30.08,
+      "maxX": -30.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -2.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -30.08,
+      "maxX": -30.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 0.43,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -29.08,
+      "maxX": -29.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 11.93,
+      "maxZ": 13.93
+    },
+    {
+      "type": "wall",
+      "minX": -29.08,
+      "maxX": -29.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 11.93,
+      "maxZ": 15.93
+    },
+    {
+      "type": "wall",
+      "minX": -29.08,
+      "maxX": -29.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 11.93,
+      "maxZ": 15.93
+    },
+    {
+      "type": "wall",
+      "minX": -29.08,
+      "maxX": -29.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 13.93,
+      "maxZ": 15.93
+    },
+    {
+      "type": "wall",
+      "minX": -29.08,
+      "maxX": -27.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -15.07,
+      "maxZ": -15.07
+    },
+    {
+      "type": "wall",
+      "minX": -29.08,
+      "maxX": -27.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -9.07,
+      "maxZ": -9.07
+    },
+    {
+      "type": "wall",
+      "minX": -27.08,
+      "maxX": -27.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -15.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": -27.08,
+      "maxX": -27.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -15.07,
+      "maxZ": -9.07
+    },
+    {
+      "type": "wall",
+      "minX": -27.08,
+      "maxX": -27.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -15.07,
+      "maxZ": -9.07
+    },
+    {
+      "type": "wall",
+      "minX": -27.08,
+      "maxX": -27.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -9.07
+    },
+    {
+      "type": "wall",
+      "minX": -27.08,
+      "maxX": -27.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -5.07,
+      "maxZ": -2.57
+    },
+    {
+      "type": "wall",
+      "minX": -27.08,
+      "maxX": -27.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -5.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": -27.08,
+      "maxX": -27.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -5.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": -27.08,
+      "maxX": -27.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -2.57,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": -27.08,
+      "maxX": -25.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -5.07,
+      "maxZ": -5.07
+    },
+    {
+      "type": "wall",
+      "minX": -27.08,
+      "maxX": -25.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -0.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": -27.08,
+      "maxX": -23.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -5.07,
+      "maxZ": -5.07
+    },
+    {
+      "type": "wall",
+      "minX": -27.08,
+      "maxX": -23.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -5.07,
+      "maxZ": -5.07
+    },
+    {
+      "type": "wall",
+      "minX": -27.08,
+      "maxX": -23.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -0.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": -27.08,
+      "maxX": -23.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -0.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": -26.08,
+      "maxX": -26.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 5.93,
+      "maxZ": 8.43
+    },
+    {
+      "type": "wall",
+      "minX": -26.08,
+      "maxX": -26.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 5.93,
+      "maxZ": 10.93
+    },
+    {
+      "type": "wall",
+      "minX": -26.08,
+      "maxX": -26.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 5.93,
+      "maxZ": 10.93
+    },
+    {
+      "type": "wall",
+      "minX": -26.08,
+      "maxX": -26.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 8.43,
+      "maxZ": 10.93
+    },
+    {
+      "type": "wall",
+      "minX": -26.08,
+      "maxX": -24.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 5.93,
+      "maxZ": 5.93
+    },
+    {
+      "type": "wall",
+      "minX": -26.08,
+      "maxX": -24.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 10.93,
+      "maxZ": 10.93
+    },
+    {
+      "type": "wall",
+      "minX": -26.08,
+      "maxX": -22.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 5.93,
+      "maxZ": 5.93
+    },
+    {
+      "type": "wall",
+      "minX": -26.08,
+      "maxX": -22.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 5.93,
+      "maxZ": 5.93
+    },
+    {
+      "type": "wall",
+      "minX": -26.08,
+      "maxX": -22.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 10.93,
+      "maxZ": 10.93
+    },
+    {
+      "type": "wall",
+      "minX": -26.08,
+      "maxX": -22.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 10.93,
+      "maxZ": 10.93
+    },
+    {
+      "type": "wall",
+      "minX": -25.08,
+      "maxX": -23.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -5.07,
+      "maxZ": -5.07
+    },
+    {
+      "type": "wall",
+      "minX": -25.08,
+      "maxX": -23.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -0.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": -24.08,
+      "maxX": -22.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 5.93,
+      "maxZ": 5.93
+    },
+    {
+      "type": "wall",
+      "minX": -24.08,
+      "maxX": -22.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 10.93,
+      "maxZ": 10.93
+    },
+    {
+      "type": "wall",
+      "minX": -23.08,
+      "maxX": -23.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -5.07,
+      "maxZ": -2.57
+    },
+    {
+      "type": "wall",
+      "minX": -23.08,
+      "maxX": -23.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -5.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": -23.08,
+      "maxX": -23.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -5.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": -23.08,
+      "maxX": -23.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -2.57,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": -22.08,
+      "maxX": -22.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 5.93,
+      "maxZ": 8.43
+    },
+    {
+      "type": "wall",
+      "minX": -22.08,
+      "maxX": -22.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 5.93,
+      "maxZ": 10.93
+    },
+    {
+      "type": "wall",
+      "minX": -22.08,
+      "maxX": -22.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 5.93,
+      "maxZ": 10.93
+    },
+    {
+      "type": "wall",
+      "minX": -22.08,
+      "maxX": -22.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 8.43,
+      "maxZ": 10.93
+    },
+    {
+      "type": "wall",
+      "minX": -18.08,
+      "maxX": -18.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -9.57
+    },
+    {
+      "type": "wall",
+      "minX": -18.08,
+      "maxX": -18.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -12.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": -18.08,
+      "maxX": -18.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": -18.08,
+      "maxX": -18.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -9.57,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": -18.08,
+      "maxX": -16.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": -18.08,
+      "maxX": -16.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -7.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": -18.08,
+      "maxX": -14.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -12.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": -18.08,
+      "maxX": -14.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": -18.08,
+      "maxX": -14.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -7.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": -18.08,
+      "maxX": -14.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -7.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": -16.08,
+      "maxX": -16.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 6.93,
+      "maxZ": 10.43
+    },
+    {
+      "type": "wall",
+      "minX": -16.08,
+      "maxX": -16.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 6.93,
+      "maxZ": 13.93
+    },
+    {
+      "type": "wall",
+      "minX": -16.08,
+      "maxX": -16.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 6.93,
+      "maxZ": 13.93
+    },
+    {
+      "type": "wall",
+      "minX": -16.08,
+      "maxX": -16.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 10.43,
+      "maxZ": 13.93
+    },
+    {
+      "type": "wall",
+      "minX": -16.08,
+      "maxX": -14.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": -16.08,
+      "maxX": -14.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -7.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": -16.08,
+      "maxX": -14.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 6.93,
+      "maxZ": 6.93
+    },
+    {
+      "type": "wall",
+      "minX": -16.08,
+      "maxX": -14.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 13.93,
+      "maxZ": 13.93
+    },
+    {
+      "type": "wall",
+      "minX": -16.08,
+      "maxX": -12.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 6.93,
+      "maxZ": 6.93
+    },
+    {
+      "type": "wall",
+      "minX": -16.08,
+      "maxX": -12.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 6.93,
+      "maxZ": 6.93
+    },
+    {
+      "type": "wall",
+      "minX": -16.08,
+      "maxX": -12.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 13.93,
+      "maxZ": 13.93
+    },
+    {
+      "type": "wall",
+      "minX": -16.08,
+      "maxX": -12.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 13.93,
+      "maxZ": 13.93
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -14.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -9.57
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -14.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -12.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -14.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -14.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -9.57,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -14.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -14.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -3.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -14.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -14.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -0.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -12.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -3.07
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -12.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 2.93,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -12.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 6.93,
+      "maxZ": 6.93
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -12.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 13.93,
+      "maxZ": 13.93
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -10.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -3.07,
+      "maxZ": -3.07
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -10.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -3.07
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -10.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 2.93,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -14.08,
+      "maxX": -10.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 2.93,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -12.08,
+      "maxX": -12.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 6.93,
+      "maxZ": 10.43
+    },
+    {
+      "type": "wall",
+      "minX": -12.08,
+      "maxX": -12.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 6.93,
+      "maxZ": 13.93
+    },
+    {
+      "type": "wall",
+      "minX": -12.08,
+      "maxX": -12.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 6.93,
+      "maxZ": 13.93
+    },
+    {
+      "type": "wall",
+      "minX": -12.08,
+      "maxX": -12.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 10.43,
+      "maxZ": 13.93
+    },
+    {
+      "type": "wall",
+      "minX": -12.08,
+      "maxX": -10.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -3.07
+    },
+    {
+      "type": "wall",
+      "minX": -12.08,
+      "maxX": -10.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 2.93,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -11.08,
+      "maxX": -11.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -15.07,
+      "maxZ": -12.57
+    },
+    {
+      "type": "wall",
+      "minX": -11.08,
+      "maxX": -11.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -15.07,
+      "maxZ": -10.07
+    },
+    {
+      "type": "wall",
+      "minX": -11.08,
+      "maxX": -11.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -15.07,
+      "maxZ": -10.07
+    },
+    {
+      "type": "wall",
+      "minX": -11.08,
+      "maxX": -11.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -12.57,
+      "maxZ": -10.07
+    },
+    {
+      "type": "wall",
+      "minX": -11.08,
+      "maxX": -8.58,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -15.07,
+      "maxZ": -15.07
+    },
+    {
+      "type": "wall",
+      "minX": -11.08,
+      "maxX": -8.58,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -10.07,
+      "maxZ": -10.07
+    },
+    {
+      "type": "wall",
+      "minX": -11.08,
+      "maxX": -6.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -15.07,
+      "maxZ": -15.07
+    },
+    {
+      "type": "wall",
+      "minX": -11.08,
+      "maxX": -6.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -15.07,
+      "maxZ": -15.07
+    },
+    {
+      "type": "wall",
+      "minX": -11.08,
+      "maxX": -6.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -10.07,
+      "maxZ": -10.07
+    },
+    {
+      "type": "wall",
+      "minX": -11.08,
+      "maxX": -6.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -10.07,
+      "maxZ": -10.07
+    },
+    {
+      "type": "wall",
+      "minX": -10.08,
+      "maxX": -10.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": -10.08,
+      "maxX": -10.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -3.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -10.08,
+      "maxX": -10.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -10.08,
+      "maxX": -10.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -0.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": -8.58,
+      "maxX": -6.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -15.07,
+      "maxZ": -15.07
+    },
+    {
+      "type": "wall",
+      "minX": -8.58,
+      "maxX": -6.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -10.07,
+      "maxZ": -10.07
+    },
+    {
+      "type": "wall",
+      "minX": -7.08,
+      "maxX": -7.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 7.93,
+      "maxZ": 9.93
+    },
+    {
+      "type": "wall",
+      "minX": -7.08,
+      "maxX": -7.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 7.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": -7.08,
+      "maxX": -7.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 7.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": -7.08,
+      "maxX": -7.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 9.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": -7.08,
+      "maxX": -4.58,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 7.93,
+      "maxZ": 7.93
+    },
+    {
+      "type": "wall",
+      "minX": -7.08,
+      "maxX": -4.58,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 11.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": -7.08,
+      "maxX": -2.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 7.93,
+      "maxZ": 7.93
+    },
+    {
+      "type": "wall",
+      "minX": -7.08,
+      "maxX": -2.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 7.93,
+      "maxZ": 7.93
+    },
+    {
+      "type": "wall",
+      "minX": -7.08,
+      "maxX": -2.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 11.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": -7.08,
+      "maxX": -2.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 11.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": -6.08,
+      "maxX": -6.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -15.07,
+      "maxZ": -12.57
+    },
+    {
+      "type": "wall",
+      "minX": -6.08,
+      "maxX": -6.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -15.07,
+      "maxZ": -10.07
+    },
+    {
+      "type": "wall",
+      "minX": -6.08,
+      "maxX": -6.08,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -15.07,
+      "maxZ": -10.07
+    },
+    {
+      "type": "wall",
+      "minX": -6.08,
+      "maxX": -6.08,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -12.57,
+      "maxZ": -10.07
+    },
+    {
+      "type": "wall",
+      "minX": -4.58,
+      "maxX": -2.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 7.93,
+      "maxZ": 7.93
+    },
+    {
+      "type": "wall",
+      "minX": -4.58,
+      "maxX": -2.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 11.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -4.08,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": -2.57,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -4.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -2.57,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -4.08,
+      "minY": 1.8,
+      "maxY": 2.0,
+      "minZ": -2.57,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -4.08,
+      "minY": 1.8,
+      "maxY": 2.0,
+      "minZ": -2.57,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -4.08,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": 1.93,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -4.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 1.93,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -3.83,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": -2.07,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -3.83,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": 1.93,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -3.58,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": -2.57,
+      "maxZ": -2.57
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -3.58,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -2.57,
+      "maxZ": -2.57
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -3.58,
+      "minY": 1.0,
+      "maxY": 1.4,
+      "minZ": -2.07,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -3.58,
+      "minY": 1.4,
+      "maxY": 1.8,
+      "minZ": -2.07,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -3.58,
+      "minY": 1.0,
+      "maxY": 1.4,
+      "minZ": 1.93,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -3.58,
+      "minY": 1.4,
+      "maxY": 1.8,
+      "minZ": 1.93,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -3.58,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": 2.43,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": -3.58,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 2.43,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": 3.42,
+      "minY": 1.8,
+      "maxY": 2.0,
+      "minZ": 2.43,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": 3.92,
+      "minY": 1.8,
+      "maxY": 2.0,
+      "minZ": -2.57,
+      "maxZ": -2.57
+    },
+    {
+      "type": "wall",
+      "minX": -4.08,
+      "maxX": 3.92,
+      "minY": 1.8,
+      "maxY": 2.0,
+      "minZ": 2.43,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": -3.83,
+      "maxX": -3.58,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": -2.07,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": -3.83,
+      "maxX": -3.58,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": 1.93,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": -3.58,
+      "maxX": -3.58,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": -2.57,
+      "maxZ": -2.32
+    },
+    {
+      "type": "wall",
+      "minX": -3.58,
+      "maxX": -3.58,
+      "minY": 1.0,
+      "maxY": 1.4,
+      "minZ": -2.57,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": -3.58,
+      "maxX": -3.58,
+      "minY": 1.4,
+      "maxY": 1.8,
+      "minZ": -2.57,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": -3.58,
+      "maxX": -3.58,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": -2.32,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": -3.58,
+      "maxX": -3.58,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": 1.93,
+      "maxZ": 2.18
+    },
+    {
+      "type": "wall",
+      "minX": -3.58,
+      "maxX": -3.58,
+      "minY": 1.0,
+      "maxY": 1.4,
+      "minZ": 1.93,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": -3.58,
+      "maxX": -3.58,
+      "minY": 1.4,
+      "maxY": 1.8,
+      "minZ": 1.93,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": -3.58,
+      "maxX": -3.58,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": 2.18,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": -3.58,
+      "maxX": 3.92,
+      "minY": 1.8,
+      "maxY": 2.0,
+      "minZ": -2.57,
+      "maxZ": -2.57
+    },
+    {
+      "type": "wall",
+      "minX": -2.08,
+      "maxX": -2.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 7.93,
+      "maxZ": 9.93
+    },
+    {
+      "type": "wall",
+      "minX": -2.08,
+      "maxX": -2.08,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 7.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": -2.08,
+      "maxX": -2.08,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 7.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": -2.08,
+      "maxX": -2.08,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 9.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": -0.08,
+      "maxX": 38.92,
+      "minY": 0.0,
+      "maxY": 1.0,
+      "minZ": -19.07,
+      "maxZ": -19.07
+    },
+    {
+      "type": "wall",
+      "minX": -0.08,
+      "maxX": 38.92,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": -19.07,
+      "maxZ": -19.07
+    },
+    {
+      "type": "wall",
+      "minX": -0.08,
+      "maxX": 38.92,
+      "minY": 0.0,
+      "maxY": 1.0,
+      "minZ": 18.93,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": -0.08,
+      "maxX": 38.92,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": 18.93,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": -0.08,
+      "maxX": 39.92,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": -20.07,
+      "maxZ": -20.07
+    },
+    {
+      "type": "wall",
+      "minX": -0.08,
+      "maxX": 39.92,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": 19.93,
+      "maxZ": 19.93
+    },
+    {
+      "type": "wall",
+      "minX": 1.92,
+      "maxX": 1.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -10.07
+    },
+    {
+      "type": "wall",
+      "minX": 1.92,
+      "maxX": 1.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -12.07,
+      "maxZ": -8.07
+    },
+    {
+      "type": "wall",
+      "minX": 1.92,
+      "maxX": 1.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -8.07
+    },
+    {
+      "type": "wall",
+      "minX": 1.92,
+      "maxX": 1.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -10.07,
+      "maxZ": -8.07
+    },
+    {
+      "type": "wall",
+      "minX": 1.92,
+      "maxX": 4.42,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": 1.92,
+      "maxX": 4.42,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -8.07,
+      "maxZ": -8.07
+    },
+    {
+      "type": "wall",
+      "minX": 1.92,
+      "maxX": 6.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -12.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": 1.92,
+      "maxX": 6.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": 1.92,
+      "maxX": 6.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -8.07,
+      "maxZ": -8.07
+    },
+    {
+      "type": "wall",
+      "minX": 1.92,
+      "maxX": 6.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -8.07,
+      "maxZ": -8.07
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.42,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": -2.57,
+      "maxZ": -2.32
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.42,
+      "minY": 1.0,
+      "maxY": 1.4,
+      "minZ": -2.57,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.42,
+      "minY": 1.4,
+      "maxY": 1.8,
+      "minZ": -2.57,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.42,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": -2.32,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.42,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": 1.93,
+      "maxZ": 2.18
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.42,
+      "minY": 1.0,
+      "maxY": 1.4,
+      "minZ": 1.93,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.42,
+      "minY": 1.4,
+      "maxY": 1.8,
+      "minZ": 1.93,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.42,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": 2.18,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.67,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": -2.07,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.67,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": 1.93,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.92,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": -2.57,
+      "maxZ": -2.57
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -2.57,
+      "maxZ": -2.57
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.92,
+      "minY": 1.0,
+      "maxY": 1.4,
+      "minZ": -2.07,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.92,
+      "minY": 1.4,
+      "maxY": 1.8,
+      "minZ": -2.07,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.92,
+      "minY": 1.0,
+      "maxY": 1.4,
+      "minZ": 1.93,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.92,
+      "minY": 1.4,
+      "maxY": 1.8,
+      "minZ": 1.93,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.92,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": 2.43,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": 3.42,
+      "maxX": 3.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 2.43,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": 3.67,
+      "maxX": 3.92,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": -2.07,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": 3.67,
+      "maxX": 3.92,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": 1.93,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": 3.92,
+      "maxX": 3.92,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": -2.57,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": 3.92,
+      "maxX": 3.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -2.57,
+      "maxZ": -2.07
+    },
+    {
+      "type": "wall",
+      "minX": 3.92,
+      "maxX": 3.92,
+      "minY": 1.8,
+      "maxY": 2.0,
+      "minZ": -2.57,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": 3.92,
+      "maxX": 3.92,
+      "minY": 1.8,
+      "maxY": 2.0,
+      "minZ": -2.07,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": 3.92,
+      "maxX": 3.92,
+      "minY": 1.0,
+      "maxY": 1.8,
+      "minZ": 1.93,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": 3.92,
+      "maxX": 3.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 1.93,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": 4.42,
+      "maxX": 6.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": 4.42,
+      "maxX": 6.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -8.07,
+      "maxZ": -8.07
+    },
+    {
+      "type": "wall",
+      "minX": 5.92,
+      "maxX": 5.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 9.93,
+      "maxZ": 12.43
+    },
+    {
+      "type": "wall",
+      "minX": 5.92,
+      "maxX": 5.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 9.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 5.92,
+      "maxX": 5.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 9.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 5.92,
+      "maxX": 5.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 12.43,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 5.92,
+      "maxX": 8.42,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 9.93,
+      "maxZ": 9.93
+    },
+    {
+      "type": "wall",
+      "minX": 5.92,
+      "maxX": 8.42,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 14.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 5.92,
+      "maxX": 10.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 9.93,
+      "maxZ": 9.93
+    },
+    {
+      "type": "wall",
+      "minX": 5.92,
+      "maxX": 10.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 9.93,
+      "maxZ": 9.93
+    },
+    {
+      "type": "wall",
+      "minX": 5.92,
+      "maxX": 10.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 14.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 5.92,
+      "maxX": 10.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 14.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 6.92,
+      "maxX": 6.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -10.07
+    },
+    {
+      "type": "wall",
+      "minX": 6.92,
+      "maxX": 6.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -12.07,
+      "maxZ": -8.07
+    },
+    {
+      "type": "wall",
+      "minX": 6.92,
+      "maxX": 6.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -8.07
+    },
+    {
+      "type": "wall",
+      "minX": 6.92,
+      "maxX": 6.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -10.07,
+      "maxZ": -8.07
+    },
+    {
+      "type": "wall",
+      "minX": 8.42,
+      "maxX": 10.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 9.93,
+      "maxZ": 9.93
+    },
+    {
+      "type": "wall",
+      "minX": 8.42,
+      "maxX": 10.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 14.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 9.92,
+      "maxX": 9.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": 9.92,
+      "maxX": 9.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -3.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": 9.92,
+      "maxX": 9.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": 9.92,
+      "maxX": 9.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -0.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": 9.92,
+      "maxX": 11.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -3.07
+    },
+    {
+      "type": "wall",
+      "minX": 9.92,
+      "maxX": 11.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 2.93,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": 9.92,
+      "maxX": 13.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -3.07,
+      "maxZ": -3.07
+    },
+    {
+      "type": "wall",
+      "minX": 9.92,
+      "maxX": 13.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -3.07
+    },
+    {
+      "type": "wall",
+      "minX": 9.92,
+      "maxX": 13.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 2.93,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": 9.92,
+      "maxX": 13.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 2.93,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": 10.92,
+      "maxX": 10.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 9.93,
+      "maxZ": 12.43
+    },
+    {
+      "type": "wall",
+      "minX": 10.92,
+      "maxX": 10.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 9.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 10.92,
+      "maxX": 10.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 9.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 10.92,
+      "maxX": 10.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 12.43,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 11.92,
+      "maxX": 11.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -14.07,
+      "maxZ": -10.57
+    },
+    {
+      "type": "wall",
+      "minX": 11.92,
+      "maxX": 11.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -14.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": 11.92,
+      "maxX": 11.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -14.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": 11.92,
+      "maxX": 11.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -10.57,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": 11.92,
+      "maxX": 13.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -14.07,
+      "maxZ": -14.07
+    },
+    {
+      "type": "wall",
+      "minX": 11.92,
+      "maxX": 13.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -7.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": 11.92,
+      "maxX": 13.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -3.07
+    },
+    {
+      "type": "wall",
+      "minX": 11.92,
+      "maxX": 13.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 2.93,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": 11.92,
+      "maxX": 15.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -14.07,
+      "maxZ": -14.07
+    },
+    {
+      "type": "wall",
+      "minX": 11.92,
+      "maxX": 15.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -14.07,
+      "maxZ": -14.07
+    },
+    {
+      "type": "wall",
+      "minX": 11.92,
+      "maxX": 15.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -7.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": 11.92,
+      "maxX": 15.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -7.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 13.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 13.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -3.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 13.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 13.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -0.07,
+      "maxZ": 2.93
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 13.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 6.93,
+      "maxZ": 9.43
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 13.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 6.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 13.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 6.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 13.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 9.43,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 15.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -14.07,
+      "maxZ": -14.07
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 15.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -7.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 15.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 6.93,
+      "maxZ": 6.93
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 15.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 11.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 17.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 6.93,
+      "maxZ": 6.93
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 17.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 6.93,
+      "maxZ": 6.93
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 17.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 11.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": 13.92,
+      "maxX": 17.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 11.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": 15.92,
+      "maxX": 15.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -14.07,
+      "maxZ": -10.57
+    },
+    {
+      "type": "wall",
+      "minX": 15.92,
+      "maxX": 15.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -14.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": 15.92,
+      "maxX": 15.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -14.07,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": 15.92,
+      "maxX": 15.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -10.57,
+      "maxZ": -7.07
+    },
+    {
+      "type": "wall",
+      "minX": 15.92,
+      "maxX": 17.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 6.93,
+      "maxZ": 6.93
+    },
+    {
+      "type": "wall",
+      "minX": 15.92,
+      "maxX": 17.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 11.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": 17.92,
+      "maxX": 17.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 6.93,
+      "maxZ": 9.43
+    },
+    {
+      "type": "wall",
+      "minX": 17.92,
+      "maxX": 17.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 6.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": 17.92,
+      "maxX": 17.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 6.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": 17.92,
+      "maxX": 17.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 9.43,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": 21.92,
+      "maxX": 21.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -11.07,
+      "maxZ": -8.57
+    },
+    {
+      "type": "wall",
+      "minX": 21.92,
+      "maxX": 21.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -11.07,
+      "maxZ": -6.07
+    },
+    {
+      "type": "wall",
+      "minX": 21.92,
+      "maxX": 21.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -11.07,
+      "maxZ": -6.07
+    },
+    {
+      "type": "wall",
+      "minX": 21.92,
+      "maxX": 21.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -8.57,
+      "maxZ": -6.07
+    },
+    {
+      "type": "wall",
+      "minX": 21.92,
+      "maxX": 23.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -11.07,
+      "maxZ": -11.07
+    },
+    {
+      "type": "wall",
+      "minX": 21.92,
+      "maxX": 23.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -6.07,
+      "maxZ": -6.07
+    },
+    {
+      "type": "wall",
+      "minX": 21.92,
+      "maxX": 25.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -11.07,
+      "maxZ": -11.07
+    },
+    {
+      "type": "wall",
+      "minX": 21.92,
+      "maxX": 25.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -11.07,
+      "maxZ": -11.07
+    },
+    {
+      "type": "wall",
+      "minX": 21.92,
+      "maxX": 25.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -6.07,
+      "maxZ": -6.07
+    },
+    {
+      "type": "wall",
+      "minX": 21.92,
+      "maxX": 25.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -6.07,
+      "maxZ": -6.07
+    },
+    {
+      "type": "wall",
+      "minX": 22.92,
+      "maxX": 22.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -0.07,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": 22.92,
+      "maxX": 22.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -0.07,
+      "maxZ": 4.93
+    },
+    {
+      "type": "wall",
+      "minX": 22.92,
+      "maxX": 22.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -0.07,
+      "maxZ": 4.93
+    },
+    {
+      "type": "wall",
+      "minX": 22.92,
+      "maxX": 22.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 2.43,
+      "maxZ": 4.93
+    },
+    {
+      "type": "wall",
+      "minX": 22.92,
+      "maxX": 24.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -0.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": 22.92,
+      "maxX": 24.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 4.93,
+      "maxZ": 4.93
+    },
+    {
+      "type": "wall",
+      "minX": 22.92,
+      "maxX": 26.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -0.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": 22.92,
+      "maxX": 26.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -0.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": 22.92,
+      "maxX": 26.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 4.93,
+      "maxZ": 4.93
+    },
+    {
+      "type": "wall",
+      "minX": 22.92,
+      "maxX": 26.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 4.93,
+      "maxZ": 4.93
+    },
+    {
+      "type": "wall",
+      "minX": 23.92,
+      "maxX": 25.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -11.07,
+      "maxZ": -11.07
+    },
+    {
+      "type": "wall",
+      "minX": 23.92,
+      "maxX": 25.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -6.07,
+      "maxZ": -6.07
+    },
+    {
+      "type": "wall",
+      "minX": 24.92,
+      "maxX": 26.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -0.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": 24.92,
+      "maxX": 26.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 4.93,
+      "maxZ": 4.93
+    },
+    {
+      "type": "wall",
+      "minX": 25.92,
+      "maxX": 25.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -11.07,
+      "maxZ": -8.57
+    },
+    {
+      "type": "wall",
+      "minX": 25.92,
+      "maxX": 25.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": -11.07,
+      "maxZ": -6.07
+    },
+    {
+      "type": "wall",
+      "minX": 25.92,
+      "maxX": 25.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": -11.07,
+      "maxZ": -6.07
+    },
+    {
+      "type": "wall",
+      "minX": 25.92,
+      "maxX": 25.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -8.57,
+      "maxZ": -6.07
+    },
+    {
+      "type": "wall",
+      "minX": 26.92,
+      "maxX": 26.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -0.07,
+      "maxZ": 2.43
+    },
+    {
+      "type": "wall",
+      "minX": 26.92,
+      "maxX": 26.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -0.07,
+      "maxZ": 4.93
+    },
+    {
+      "type": "wall",
+      "minX": 26.92,
+      "maxX": 26.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -0.07,
+      "maxZ": 4.93
+    },
+    {
+      "type": "wall",
+      "minX": 26.92,
+      "maxX": 26.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 2.43,
+      "maxZ": 4.93
+    },
+    {
+      "type": "wall",
+      "minX": 26.92,
+      "maxX": 26.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 8.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": 26.92,
+      "maxX": 26.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 8.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 26.92,
+      "maxX": 26.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 8.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 26.92,
+      "maxX": 26.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 11.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 26.92,
+      "maxX": 28.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 8.93,
+      "maxZ": 8.93
+    },
+    {
+      "type": "wall",
+      "minX": 26.92,
+      "maxX": 28.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 14.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 26.92,
+      "maxX": 30.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 8.93,
+      "maxZ": 8.93
+    },
+    {
+      "type": "wall",
+      "minX": 26.92,
+      "maxX": 30.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 8.93,
+      "maxZ": 8.93
+    },
+    {
+      "type": "wall",
+      "minX": 26.92,
+      "maxX": 30.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 14.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 26.92,
+      "maxX": 30.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 14.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 28.92,
+      "maxX": 28.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -16.07,
+      "maxZ": -14.07
+    },
+    {
+      "type": "wall",
+      "minX": 28.92,
+      "maxX": 28.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -16.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": 28.92,
+      "maxX": 28.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -16.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": 28.92,
+      "maxX": 28.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -14.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": 28.92,
+      "maxX": 30.42,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -16.07,
+      "maxZ": -16.07
+    },
+    {
+      "type": "wall",
+      "minX": 28.92,
+      "maxX": 30.42,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -12.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": 28.92,
+      "maxX": 30.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 8.93,
+      "maxZ": 8.93
+    },
+    {
+      "type": "wall",
+      "minX": 28.92,
+      "maxX": 30.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 14.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 28.92,
+      "maxX": 31.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -16.07,
+      "maxZ": -16.07
+    },
+    {
+      "type": "wall",
+      "minX": 28.92,
+      "maxX": 31.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -16.07,
+      "maxZ": -16.07
+    },
+    {
+      "type": "wall",
+      "minX": 28.92,
+      "maxX": 31.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -12.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": 28.92,
+      "maxX": 31.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -12.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": 29.92,
+      "maxX": 29.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -0.57
+    },
+    {
+      "type": "wall",
+      "minX": 29.92,
+      "maxX": 29.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -3.07,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": 29.92,
+      "maxX": 29.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": 29.92,
+      "maxX": 29.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -0.57,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": 29.92,
+      "maxX": 32.42,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -3.07
+    },
+    {
+      "type": "wall",
+      "minX": 29.92,
+      "maxX": 32.42,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 1.93,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": 29.92,
+      "maxX": 34.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -3.07,
+      "maxZ": -3.07
+    },
+    {
+      "type": "wall",
+      "minX": 29.92,
+      "maxX": 34.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -3.07
+    },
+    {
+      "type": "wall",
+      "minX": 29.92,
+      "maxX": 34.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 1.93,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": 29.92,
+      "maxX": 34.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": 1.93,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": 30.42,
+      "maxX": 31.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -16.07,
+      "maxZ": -16.07
+    },
+    {
+      "type": "wall",
+      "minX": 30.42,
+      "maxX": 31.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -12.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": 30.92,
+      "maxX": 30.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 8.93,
+      "maxZ": 11.93
+    },
+    {
+      "type": "wall",
+      "minX": 30.92,
+      "maxX": 30.92,
+      "minY": 1.0,
+      "maxY": 1.5,
+      "minZ": 8.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 30.92,
+      "maxX": 30.92,
+      "minY": 1.5,
+      "maxY": 2.0,
+      "minZ": 8.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 30.92,
+      "maxX": 30.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": 11.93,
+      "maxZ": 14.93
+    },
+    {
+      "type": "wall",
+      "minX": 31.92,
+      "maxX": 31.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -16.07,
+      "maxZ": -14.07
+    },
+    {
+      "type": "wall",
+      "minX": 31.92,
+      "maxX": 31.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -16.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": 31.92,
+      "maxX": 31.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -16.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": 31.92,
+      "maxX": 31.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -14.07,
+      "maxZ": -12.07
+    },
+    {
+      "type": "wall",
+      "minX": 32.42,
+      "maxX": 34.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -3.07
+    },
+    {
+      "type": "wall",
+      "minX": 32.42,
+      "maxX": 34.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": 1.93,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": 34.92,
+      "maxX": 34.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": -0.57
+    },
+    {
+      "type": "wall",
+      "minX": 34.92,
+      "maxX": 34.92,
+      "minY": 1.0,
+      "maxY": 2.0,
+      "minZ": -3.07,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": 34.92,
+      "maxX": 34.92,
+      "minY": 2.0,
+      "maxY": 3.0,
+      "minZ": -3.07,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": 34.92,
+      "maxX": 34.92,
+      "minY": 1.0,
+      "maxY": 3.0,
+      "minZ": -0.57,
+      "maxZ": 1.93
+    },
+    {
+      "type": "wall",
+      "minX": 38.92,
+      "maxX": 38.92,
+      "minY": 0.0,
+      "maxY": 1.0,
+      "minZ": -19.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": 38.92,
+      "maxX": 38.92,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": -19.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": 38.92,
+      "maxX": 38.92,
+      "minY": 0.0,
+      "maxY": 0.5,
+      "minZ": -19.07,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": 38.92,
+      "maxX": 38.92,
+      "minY": 0.0,
+      "maxY": 5.0,
+      "minZ": -19.07,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": 38.92,
+      "maxX": 38.92,
+      "minY": 0.5,
+      "maxY": 1.0,
+      "minZ": -19.07,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": 38.92,
+      "maxX": 38.92,
+      "minY": 5.0,
+      "maxY": 10.0,
+      "minZ": -19.07,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": 38.92,
+      "maxX": 38.92,
+      "minY": 0.0,
+      "maxY": 1.0,
+      "minZ": -0.07,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": 38.92,
+      "maxX": 38.92,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": -0.07,
+      "maxZ": 18.93
+    },
+    {
+      "type": "wall",
+      "minX": 39.92,
+      "maxX": 39.92,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": -20.07,
+      "maxZ": -0.07
+    },
+    {
+      "type": "wall",
+      "minX": 39.92,
+      "maxX": 39.92,
+      "minY": 0.0,
+      "maxY": 5.0,
+      "minZ": -20.07,
+      "maxZ": 19.93
+    },
+    {
+      "type": "wall",
+      "minX": 39.92,
+      "maxX": 39.92,
+      "minY": 5.0,
+      "maxY": 10.0,
+      "minZ": -20.07,
+      "maxZ": 19.93
+    },
+    {
+      "type": "wall",
+      "minX": 39.92,
+      "maxX": 39.92,
+      "minY": 0.0,
+      "maxY": 10.0,
+      "minZ": -0.07,
+      "maxZ": 19.93
     }
   ],
   "teamSpawns": {
     "red": [
       {
-        "x": -15,
+        "x": -35.0,
         "y": 1.7,
-        "z": -8
+        "z": -14.0
       },
       {
-        "x": -15,
+        "x": -35.0,
         "y": 1.7,
-        "z": 0
+        "z": -6.0
       },
       {
-        "x": -15,
+        "x": -35.0,
         "y": 1.7,
-        "z": 6
+        "z": 14.0
       }
     ],
     "blue": [
       {
-        "x": 15,
+        "x": 35.0,
         "y": 1.7,
-        "z": -8
+        "z": -14.0
       },
       {
-        "x": 15,
+        "x": 35.0,
         "y": 1.7,
-        "z": 0
+        "z": -6.0
       },
       {
-        "x": 15,
+        "x": 35.0,
         "y": 1.7,
-        "z": 6
+        "z": 14.0
       }
     ]
   },
   "weaponPickups": [
     {
       "weaponId": "smg",
-      "x": -6,
-      "y": 1,
-      "z": 0
+      "x": -12.0,
+      "y": 1.0,
+      "z": 0.0
     },
     {
       "weaponId": "rifle",
-      "x": 6,
-      "y": 1,
-      "z": 0
+      "x": 12.0,
+      "y": 1.0,
+      "z": 0.0
     },
     {
       "weaponId": "rifle",
-      "x": 0,
-      "y": 3.8000000000000003,
-      "z": 11
+      "x": 0.0,
+      "y": 3.8,
+      "z": 12.0
     }
   ],
   "vestSpawns": [
     {
-      "x": -2.5,
-      "y": 1,
-      "z": 3
+      "x": -5.0,
+      "y": 1.0,
+      "z": 6.0
     },
     {
-      "x": 2.5,
-      "y": 1,
-      "z": -3
+      "x": 5.0,
+      "y": 1.0,
+      "z": -6.0
     }
   ],
   "lights": [
     {
       "color": "#ff4d4d",
       "intensity": 6,
-      "distance": 12,
+      "distance": 16,
       "decay": 2,
-      "x": -18,
-      "y": 3,
-      "z": 0
+      "x": -34.0,
+      "y": 5.0,
+      "z": 0.0
     },
     {
       "color": "#4d94ff",
       "intensity": 6,
-      "distance": 12,
+      "distance": 16,
       "decay": 2,
-      "x": 18,
-      "y": 3,
-      "z": 0
+      "x": 34.0,
+      "y": 5.0,
+      "z": 0.0
     }
   ]
 }
