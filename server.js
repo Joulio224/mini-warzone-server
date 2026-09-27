@@ -320,6 +320,20 @@ const players = new Map();
 const VEST_SPAWN_POINTS = mapData.vestSpawns;
 const vests = new Map(); // vestId -> { position, spawnIndex }
 
+// Minuteurs de réapparition (gilets + armes) actuellement en attente — voir
+// scheduleRespawn/resetWorld un peu plus bas. Sans ce suivi, un reset ne
+// pourrait pas les annuler et un gilet/arme fantôme finirait par apparaître
+// en double sur un point déjà réapprovisionné par le reset.
+const pendingRespawns = new Set();
+
+function scheduleRespawn(fn, delay) {
+  const timer = setTimeout(() => {
+    pendingRespawns.delete(timer);
+    fn();
+  }, delay);
+  pendingRespawns.add(timer);
+}
+
 function spawnVestAt(spawnIndex) {
   const vestId = randomUUID();
   const position = VEST_SPAWN_POINTS[spawnIndex];
@@ -335,6 +349,26 @@ function spawnWeaponPickupAt(spawnIndex) {
   const { weaponId, x, y, z } = WEAPON_PICKUP_POINTS[spawnIndex];
   weaponPickups.set(pickupId, { weaponId, position: { x, y, z }, spawnIndex });
   io.emit('weapon-pickup-spawned', { id: pickupId, weaponId, position: { x, y, z } });
+}
+
+// Fait apparaître tous les gilets/armes de la carte à leurs emplacements —
+// utilisé au démarrage du serveur ET à chaque reset (voir plus bas).
+function spawnAllPickups() {
+  VEST_SPAWN_POINTS.forEach((_, index) => spawnVestAt(index));
+  WEAPON_PICKUP_POINTS.forEach((_, index) => spawnWeaponPickupAt(index));
+}
+
+// Dès que le dernier joueur quitte (voir 'disconnect' plus bas), on efface
+// tout le stuff au sol et les réapparitions en attente, puis on repart d'une
+// carte entièrement fraîche — plutôt que de laisser une carte à moitié
+// pillée traîner (et accumuler des minuteurs) jusqu'au retour de quelqu'un.
+function resetWorld() {
+  pendingRespawns.forEach((timer) => clearTimeout(timer));
+  pendingRespawns.clear();
+  vests.clear();
+  weaponPickups.clear();
+  spawnAllPickups();
+  console.log('[reset] plus personne en jeu — carte réinitialisée (gilets/armes remis à zéro)');
 }
 
 // ---------------------------------------------------------------------------
@@ -576,7 +610,7 @@ io.on('connection', (socket) => {
     player.vestCount += 1;
     io.to(socket.id).emit('your-vest-count', { count: player.vestCount });
 
-    setTimeout(() => spawnVestAt(vest.spawnIndex), VEST_RESPAWN_MS);
+    scheduleRespawn(() => spawnVestAt(vest.spawnIndex), VEST_RESPAWN_MS);
   });
 
   // Activation d'un gilet en réserve (clic droit avec le slot gilets
@@ -616,7 +650,7 @@ io.on('connection', (socket) => {
     player.weapons[1] = { id: pickup.weaponId, rarity: 'gray' };
     io.to(socket.id).emit('your-weapons', { weapons: player.weapons });
 
-    setTimeout(() => spawnWeaponPickupAt(pickup.spawnIndex), WEAPON_PICKUP_RESPAWN_MS);
+    scheduleRespawn(() => spawnWeaponPickupAt(pickup.spawnIndex), WEAPON_PICKUP_RESPAWN_MS);
   });
 
   // ---------------------------------------------------------------------
@@ -638,11 +672,11 @@ io.on('connection', (socket) => {
     players.delete(socket.id);
     io.emit('player-left', { id: socket.id });
     console.log(`[-] ${player.pseudo} (${socket.id}) — ${players.size} joueur(s) connecté(s)`);
+    if (players.size === 0) resetWorld();
   });
 });
 
 httpServer.listen(PORT, () => {
-  VEST_SPAWN_POINTS.forEach((_, index) => spawnVestAt(index));
-  WEAPON_PICKUP_POINTS.forEach((_, index) => spawnWeaponPickupAt(index));
+  spawnAllPickups();
   console.log(`Serveur Mini Warzone (Socket.io) lancé sur http://localhost:${PORT}`);
 });
