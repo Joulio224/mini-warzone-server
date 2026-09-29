@@ -11,7 +11,6 @@
 // 2e terminal), pendant que le client tourne sur http://localhost:5173.
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
-import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 // Toutes les données de la map (collisions, spawns d'équipe, points
@@ -35,25 +34,14 @@ const BODY_SAMPLE_OFFSETS = [-1.6, -1.1, -0.6, -0.1, 0.15]; // pieds -> tête
 const RESPAWN_DELAY_MS = 3000;
 
 // Bouclier (gilets pare-balle) : le "stuff" contient des gilets en réserve
-// (ramassés au sol ou achetés en boutique), chacun ajouté au bouclier actif
-// seulement quand le joueur choisit de l'utiliser (clic droit sur le slot
-// gilets) — pas automatiquement au ramassage/achat. MAX_SHIELD_VESTS est le
-// nombre de base (2) ; la capacité spéciale "3e emplacement de gilet" (voir
-// ÉCONOMIE) le porte à 3 pour le joueur qui l'achète, jusqu'à la fin de la
-// partie en cours. Doit rester identique à src/shop.js et src/main.js.
+// (achetés en boutique), chacun ajouté au bouclier actif seulement quand le
+// joueur choisit de l'utiliser (touche P) — pas automatiquement à l'achat.
+// MAX_SHIELD_VESTS est le nombre de base (2) ; la capacité spéciale "3e
+// emplacement de gilet" (voir ÉCONOMIE) le porte à 3 pour le joueur qui
+// l'achète, jusqu'à la fin de la partie en cours. Doit rester identique à
+// src/shop.js et src/main.js.
 const SHIELD_PER_VEST = 25;
 const MAX_SHIELD_VESTS = 2;
-const VEST_COLLECT_RADIUS = 1.8;
-const VEST_RESPAWN_MS = 25000;
-
-// Armes ramassables au sol : le slot 0 est toujours le pistolet de départ
-// (jamais perdu), le slot 1 se remplit en ramassant une arme au sol — un
-// point de spawn fixe par arme (voir mapData.weaponPickups), jamais
-// aléatoire. Les armes trouvées au sol sont toujours de rareté "gray" (la
-// rareté supérieure ne s'obtient qu'en boutique, voir ÉCONOMIE).
-const WEAPON_PICKUP_POINTS = mapData.weaponPickups;
-const WEAPON_PICKUP_COLLECT_RADIUS = 1.8;
-const WEAPON_PICKUP_RESPAWN_MS = 30000;
 
 function shieldSteps(player) {
   return Math.min(player.maxVestSlots, Math.ceil(player.shield / SHIELD_PER_VEST));
@@ -133,7 +121,7 @@ function isWeaponItemId(itemId) {
 // Traite un achat pour `player` (déjà vérifié vivant par l'appelant). Ne
 // fait RIEN silencieusement si l'achat est invalide (fonds insuffisants,
 // déjà possédé, slot déjà plein…) — même logique "no-op silencieux" que le
-// reste du serveur (ex. collect-vest quand la réserve est pleine) : le
+// reste du serveur (ex. use-vest quand le bouclier est déjà plein) : le
 // client empêche déjà ça via les boutons désactivés, ceci n'est qu'un
 // filet de sécurité côté autorité.
 function tryPurchase(socket, player, itemId) {
@@ -165,7 +153,7 @@ function tryPurchase(socket, player, itemId) {
 
     // Le pistolet occupe toujours le slot 0 (l'achat ne fait qu'améliorer sa
     // rareté) ; mitraillette/fusil vont dans le slot 1 (remplace ce qui s'y
-    // trouve déjà, y compris une arme ramassée au sol).
+    // trouve déjà).
     const slot = weaponId === 'pistol' ? 0 : 1;
 
     player.money -= price;
@@ -315,62 +303,6 @@ const io = new Server(httpServer, {
 //                maxVestSlots, money, alive }
 const players = new Map();
 
-// Gilets pare-balle : réapparaissent tout seuls à des emplacements fixes
-// (mapData.vestSpawns), après un délai.
-const VEST_SPAWN_POINTS = mapData.vestSpawns;
-const vests = new Map(); // vestId -> { position, spawnIndex }
-
-// Minuteurs de réapparition (gilets + armes) actuellement en attente — voir
-// scheduleRespawn/resetWorld un peu plus bas. Sans ce suivi, un reset ne
-// pourrait pas les annuler et un gilet/arme fantôme finirait par apparaître
-// en double sur un point déjà réapprovisionné par le reset.
-const pendingRespawns = new Set();
-
-function scheduleRespawn(fn, delay) {
-  const timer = setTimeout(() => {
-    pendingRespawns.delete(timer);
-    fn();
-  }, delay);
-  pendingRespawns.add(timer);
-}
-
-function spawnVestAt(spawnIndex) {
-  const vestId = randomUUID();
-  const position = VEST_SPAWN_POINTS[spawnIndex];
-  vests.set(vestId, { position, spawnIndex });
-  io.emit('vest-spawned', { id: vestId, position });
-}
-
-// weaponPickupId -> { weaponId, position, spawnIndex }
-const weaponPickups = new Map();
-
-function spawnWeaponPickupAt(spawnIndex) {
-  const pickupId = randomUUID();
-  const { weaponId, x, y, z } = WEAPON_PICKUP_POINTS[spawnIndex];
-  weaponPickups.set(pickupId, { weaponId, position: { x, y, z }, spawnIndex });
-  io.emit('weapon-pickup-spawned', { id: pickupId, weaponId, position: { x, y, z } });
-}
-
-// Fait apparaître tous les gilets/armes de la carte à leurs emplacements —
-// utilisé au démarrage du serveur ET à chaque reset (voir plus bas).
-function spawnAllPickups() {
-  VEST_SPAWN_POINTS.forEach((_, index) => spawnVestAt(index));
-  WEAPON_PICKUP_POINTS.forEach((_, index) => spawnWeaponPickupAt(index));
-}
-
-// Dès que le dernier joueur quitte (voir 'disconnect' plus bas), on efface
-// tout le stuff au sol et les réapparitions en attente, puis on repart d'une
-// carte entièrement fraîche — plutôt que de laisser une carte à moitié
-// pillée traîner (et accumuler des minuteurs) jusqu'au retour de quelqu'un.
-function resetWorld() {
-  pendingRespawns.forEach((timer) => clearTimeout(timer));
-  pendingRespawns.clear();
-  vests.clear();
-  weaponPickups.clear();
-  spawnAllPickups();
-  console.log('[reset] plus personne en jeu — carte réinitialisée (gilets/armes remis à zéro)');
-}
-
 // ---------------------------------------------------------------------------
 // Détection de tir : test rayon-sphère simple, pas besoin de Three.js côté
 // serveur — juste de la géométrie de base. On garde le point d'impact le
@@ -472,8 +404,7 @@ io.on('connection', (socket) => {
     // On dit au nouveau venu quelle équipe/quel point de spawn est le sien...
     socket.emit('team-assigned', { team, spawn });
 
-    // ...puis on lui donne la liste de ceux déjà dans l'arène, et le stuff
-    // déjà au sol...
+    // ...puis on lui donne la liste de ceux déjà dans l'arène...
     const existingPlayers = Array.from(players.entries()).map(([id, p]) => ({
       id,
       pseudo: p.pseudo,
@@ -485,19 +416,6 @@ io.on('connection', (socket) => {
       appearance: p.appearance,
     }));
     socket.emit('current-players', existingPlayers);
-
-    const existingVests = Array.from(vests.entries()).map(([id, v]) => ({
-      id,
-      position: v.position,
-    }));
-    socket.emit('current-vests', existingVests);
-
-    const existingWeaponPickups = Array.from(weaponPickups.entries()).map(([id, w]) => ({
-      id,
-      weaponId: w.weaponId,
-      position: w.position,
-    }));
-    socket.emit('current-weapon-pickups', existingWeaponPickups);
 
     // ...puis on l'ajoute et on prévient tout le monde.
     const player = {
@@ -592,29 +510,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('collect-vest', ({ vestId } = {}) => {
-    const player = players.get(socket.id);
-    const vest = vests.get(vestId);
-    if (!player || !player.alive || !vest) return;
-    if (player.vestCount >= player.maxVestSlots) return; // stuff déjà plein
-
-    const dx = player.position.x - vest.position.x;
-    const dy = player.position.y - vest.position.y;
-    const dz = player.position.z - vest.position.z;
-    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (distance > VEST_COLLECT_RADIUS) return;
-
-    vests.delete(vestId);
-    io.emit('vest-removed', { id: vestId });
-
-    player.vestCount += 1;
-    io.to(socket.id).emit('your-vest-count', { count: player.vestCount });
-
-    scheduleRespawn(() => spawnVestAt(vest.spawnIndex), VEST_RESPAWN_MS);
-  });
-
-  // Activation d'un gilet en réserve (clic droit avec le slot gilets
-  // sélectionné) : consomme 1 gilet du stuff, ajoute au bouclier actif. Le
+  // Activation d'un gilet en réserve (touche P) : consomme 1 gilet du stuff, ajoute au bouclier actif. Le
   // plafond du bouclier dépend de maxVestSlots (2, ou 3 si la capacité
   // spéciale a été achetée) — voir ÉCONOMIE plus haut.
   socket.on('use-vest', () => {
@@ -628,38 +524,6 @@ io.on('connection', (socket) => {
     io.to(socket.id).emit('your-vest-count', { count: player.vestCount });
     io.to(socket.id).emit('your-shield', { shield: player.shield });
     broadcastShieldSteps(socket.id, player);
-  });
-
-  // `slot` (0 ou 1, le slot sélectionné côté client au moment du ramassage)
-  // ne sert que si le stuff est déjà plein — voir plus bas. Comme pour
-  // 'shoot', le client ne peut choisir QUE lequel de ses propres slots se
-  // fait remplacer ; il ne peut ni inventer une arme ni éviter d'en perdre
-  // une, donc pas besoin de s'en méfier davantage.
-  socket.on('collect-weapon', ({ pickupId, slot } = {}) => {
-    const player = players.get(socket.id);
-    const pickup = weaponPickups.get(pickupId);
-    if (!player || !player.alive || !pickup) return;
-
-    const dx = player.position.x - pickup.position.x;
-    const dy = player.position.y - pickup.position.y;
-    const dz = player.position.z - pickup.position.z;
-    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (distance > WEAPON_PICKUP_COLLECT_RADIUS) return;
-
-    weaponPickups.delete(pickupId);
-    io.emit('weapon-pickup-removed', { id: pickupId });
-
-    // Les armes trouvées au sol sont toujours de rareté "gray" — la rareté
-    // supérieure est réservée à la boutique (voir ÉCONOMIE). S'il reste un
-    // slot vide (le 1, puisque le 0 démarre toujours avec le pistolet), elle
-    // le remplit ; sinon (stuff plein) elle remplace l'arme du slot que le
-    // joueur avait sélectionné au ramassage — y compris le pistolet du
-    // slot 0, qui n'est donc plus protégé contre un ramassage au sol.
-    const targetSlot = player.weapons[1] ? (slot === 0 || slot === 1 ? slot : 0) : 1;
-    player.weapons[targetSlot] = { id: pickup.weaponId, rarity: 'gray' };
-    io.to(socket.id).emit('your-weapons', { weapons: player.weapons });
-
-    scheduleRespawn(() => spawnWeaponPickupAt(pickup.spawnIndex), WEAPON_PICKUP_RESPAWN_MS);
   });
 
   // ---------------------------------------------------------------------
@@ -681,11 +545,9 @@ io.on('connection', (socket) => {
     players.delete(socket.id);
     io.emit('player-left', { id: socket.id });
     console.log(`[-] ${player.pseudo} (${socket.id}) — ${players.size} joueur(s) connecté(s)`);
-    if (players.size === 0) resetWorld();
   });
 });
 
 httpServer.listen(PORT, () => {
-  spawnAllPickups();
   console.log(`Serveur Mini Warzone (Socket.io) lancé sur http://localhost:${PORT}`);
 });
