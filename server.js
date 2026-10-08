@@ -33,6 +33,23 @@ const HIT_RADIUS = 0.35; // calé sur le rayon réel de la capsule visuelle du j
 const BODY_SAMPLE_OFFSETS = [-1.6, -1.1, -0.6, -0.1, 0.15]; // pieds -> tête
 const RESPAWN_DELAY_MS = 3000;
 
+// Compensation de latence : un tir teste la position des AUTRES joueurs telle
+// qu'elle était LAG_COMPENSATION_MS plus tôt, pas leur position toute
+// fraîche. Sans ça, viser pile sur quelqu'un qui bouge (et surtout qui
+// saute, où la hauteur change vite) rate systématiquement le tir : entre le
+// moment où le tireur VOIT la cible à l'écran et le moment où le serveur
+// reçoit le tir, la cible a déjà un peu bougé côté serveur — à cause à la
+// fois de la fréquence d'envoi des positions (~20/s, voir MOVE_SEND_INTERVAL
+// dans main.js) et du lissage visuel des autres joueurs côté client
+// (mesh.position.lerp(...)). Valeur de départ raisonnable ; à ajuster après
+// avoir testé en vrai (l'augmenter si ça rate encore, la baisser si ça
+// touche des gens qui avaient déjà visiblement esquivé).
+const LAG_COMPENSATION_MS = 150;
+// Combien de temps d'historique de position on garde par joueur pour
+// pouvoir "remonter dans le temps" — un peu plus que LAG_COMPENSATION_MS
+// par sécurité (pic de latence, petit décalage d'horloge...).
+const POSITION_HISTORY_MS = 400;
+
 // Bouclier (gilets pare-balle) : le "stuff" contient des gilets en réserve
 // (achetés en boutique), chacun ajouté au bouclier actif seulement quand le
 // joueur choisit de l'utiliser (touche P) — pas automatiquement à l'achat.
@@ -189,6 +206,28 @@ function sanitizeGroupId(input) {
 }
 
 // ---------------------------------------------------------------------------
+// Mode de jeu ("solo" ou "team") + équipe choisie par le créateur du groupe.
+// Envoyés par le client (voir game-session.js), jamais vérifiés contre
+// Firestore : le serveur ne connaît ni comptes ni groupes (voir tout en
+// haut du fichier) — mêmes limites de confiance que groupId juste au-dessus.
+// mode ne vaut vraiment 'team' que si une équipe valide l'accompagne, sinon
+// on retombe silencieusement sur 'solo' (comportement inchangé).
+function sanitizeTeamChoice(input) {
+  return input === 'red' || input === 'blue' ? input : null;
+}
+function sanitizeMode(input, team) {
+  return input === 'team' && team ? 'team' : 'solo';
+}
+
+// Deux joueurs sont coéquipiers "protégés" seulement si TOUS LES DEUX sont en
+// mode 'team' et partagent la même équipe — un joueur en solo (ou dont
+// l'équipe n'a pas encore été assignée par l'admin) reste attaquable par/vers
+// tout le monde, comme avant.
+function isFriendlyFire(shooter, target) {
+  return shooter.mode === 'team' && target.mode === 'team' && shooter.team === target.team;
+}
+
+// ---------------------------------------------------------------------------
 // Obstacles (murs + balcon + caisses de couverture) : chargés depuis
 // mapData.colliders, plus aucune géométrie codée en dur ici. Le serveur n'a
 // pas de moteur 3D — juste ces boîtes, au format {minX,maxX,minY,maxY,minZ,
@@ -268,15 +307,28 @@ function pickTeamSpawn(team, groupId) {
   return { position: { ...points[spawnIndex] }, spawnIndex };
 }
 
-// Équilibrage : le nouveau joueur rejoint l'équipe la moins nombreuse (égalité
-// → équipe rouge). Exception : s'il a un groupId et qu'un membre de ce même
-// groupe est déjà en jeu, on le met avec lui — jouer ensemble passe avant
-// l'équilibrage strict des effectifs.
-function assignTeam(groupId) {
-  if (groupId) {
-    const groupmate = Array.from(players.values()).find((p) => p.groupId === groupId);
-    if (groupmate) return groupmate.team;
-  }
+// Équilibrage : le nouveau joueur rejoint l'équipe la moins nombreuse
+// (égalité → équipe rouge).
+//
+// Pas d'exception "groupId" ici — il y en a eu une avant (mettre
+// automatiquement un groupe entier dans la même équipe), mais elle entrait
+// en conflit avec le choix de l'admin (voir ÉQUIPES ci-dessous) : dès que le
+// premier membre d'un groupe rejoignait, TOUS les suivants héritaient
+// silencieusement de SON équipe — et comme le tout premier joueur connecté
+// (equal counts) atterrit toujours côté rouge, un groupe entier qui teste
+// ensemble finissait systématiquement rouge en entier, quoi que l'admin ait
+// réellement assigné à chacun. C'est précisément le bug "tout le monde est
+// dans l'équipe rouge" : cette fonction n'est appelée QUE pour un joueur
+// sans équipe fixée par l'admin (voir le handler 'join' plus bas), donc
+// l'équilibrer normalement, sans tenir compte du groupe, est le bon
+// comportement par défaut.
+//
+// La cohésion de groupe reste assurée autrement, sans rien devoir au
+// hasard : pickTeamSpawn (juste au-dessus) fait spawner ensemble ceux qui
+// sont déjà sur la MÊME équipe (qu'elle vienne de l'admin ou de cet
+// équilibrage), et le mode Équipes + l'assignation manuelle restent le
+// moyen explicite de mettre tout un groupe du même côté.
+function assignTeam() {
   const counts = { red: 0, blue: 0 };
   players.forEach((p) => {
     counts[p.team] = (counts[p.team] || 0) + 1;
@@ -321,17 +373,44 @@ function raySphereDistance(origin, dir, center, radius) {
   return t >= 0 ? t : 0;
 }
 
-function findClosestHit(shooterId, origin, direction, maxDistance) {
+// Position interpolée de `player` au moment `t` (ms, Date.now()), à partir de
+// son historique de positions — voir LAG_COMPENSATION_MS plus haut. Si `t`
+// est plus vieux que tout l'historique gardé, on renvoie le point le plus
+// ancien disponible plutôt que d'extrapoler plus loin ; si `t` est plus
+// récent que la dernière position connue, on renvoie celle-ci telle quelle.
+function getPositionAtTime(player, t) {
+  const history = player.positionHistory;
+  if (!history || history.length === 0) return player.position;
+  if (t <= history[0].t) return history[0].position;
+  if (t >= history[history.length - 1].t) return player.position;
+
+  for (let i = 1; i < history.length; i++) {
+    if (history[i].t < t) continue;
+    const prev = history[i - 1];
+    const next = history[i];
+    const span = next.t - prev.t;
+    const ratio = span > 0 ? (t - prev.t) / span : 0;
+    return {
+      x: prev.position.x + (next.position.x - prev.position.x) * ratio,
+      y: prev.position.y + (next.position.y - prev.position.y) * ratio,
+      z: prev.position.z + (next.position.z - prev.position.z) * ratio,
+    };
+  }
+  return player.position;
+}
+
+function findClosestHit(shooterId, origin, direction, maxDistance, atTime) {
   let closestId = null;
   let closestDistance = maxDistance;
 
   players.forEach((player, id) => {
     if (id === shooterId || !player.alive) return;
+    const rewound = getPositionAtTime(player, atTime);
     for (const offsetY of BODY_SAMPLE_OFFSETS) {
       const center = {
-        x: player.position.x,
-        y: player.position.y + offsetY,
-        z: player.position.z,
+        x: rewound.x,
+        y: rewound.y + offsetY,
+        z: rewound.z,
       };
       const dist = raySphereDistance(origin, direction, center, HIT_RADIUS);
       if (dist !== null && dist < closestDistance) {
@@ -379,6 +458,10 @@ function killPlayer(victimId, killerId) {
     victim.alive = true;
     victim.hp = MAX_HP;
     victim.position = spawn;
+    // Repart de zéro : sans ça, juste après le respawn, un rewind pourrait
+    // encore remonter à l'ancienne position (avant la mort), qui n'a plus
+    // rien à voir avec où le joueur vient d'apparaître.
+    victim.positionHistory = [{ t: Date.now(), position: spawn }];
     victim.spawnIndex = spawnIndex;
     victim.weapons = [{ id: 'pistol', rarity: 'gray' }, null]; // on repart avec juste le pistolet, rareté gris
     victim.vestCount = 0;
@@ -393,12 +476,23 @@ io.on('connection', (socket) => {
   socket.on('join', (payload) => {
     // Compat : un vieux client pourrait encore envoyer juste le pseudo en
     // texte brut plutôt que { pseudo, appearance }.
-    const { pseudo: pseudoInput, appearance: appearanceInput, groupId: groupIdInput } =
-      typeof payload === 'string' ? { pseudo: payload } : payload || {};
+    const {
+      pseudo: pseudoInput,
+      appearance: appearanceInput,
+      groupId: groupIdInput,
+      mode: modeInput,
+      team: teamChoiceInput,
+    } = typeof payload === 'string' ? { pseudo: payload } : payload || {};
     const pseudo = String(pseudoInput || 'Joueur').slice(0, 20);
     const appearance = sanitizeAppearance(appearanceInput);
     const groupId = sanitizeGroupId(groupIdInput);
-    const team = assignTeam(groupId);
+
+    // Mode "Équipes" avec une couleur choisie par l'admin du groupe : on la
+    // prend telle quelle plutôt que d'auto-équilibrer. Sinon (mode "Solo", ou
+    // pas encore assigné par l'admin), comportement inchangé.
+    const teamChoice = sanitizeTeamChoice(teamChoiceInput);
+    const mode = sanitizeMode(modeInput, teamChoice);
+    const team = mode === 'team' ? teamChoice : assignTeam();
     const { position: spawn, spawnIndex } = pickTeamSpawn(team, groupId);
 
     // On dit au nouveau venu quelle équipe/quel point de spawn est le sien...
@@ -421,10 +515,14 @@ io.on('connection', (socket) => {
     const player = {
       pseudo,
       team,
+      mode,
       groupId,
       spawnIndex,
       appearance,
       position: spawn,
+      // Historique pour la compensation de latence (voir LAG_COMPENSATION_MS) —
+      // amorcé avec la position de spawn pour ne jamais être vide.
+      positionHistory: [{ t: Date.now(), position: spawn }],
       rotationY: 0,
       hp: MAX_HP,
       shield: 0,
@@ -443,7 +541,7 @@ io.on('connection', (socket) => {
     socket.broadcast.emit('player-joined', { id: socket.id, pseudo, team, position: spawn, appearance });
 
     console.log(
-      `[+] ${pseudo} (${socket.id}) — équipe ${team} — ${players.size} joueur(s) connecté(s)`
+      `[+] ${pseudo} (${socket.id}) — équipe ${team}${mode === 'team' ? ' (mode équipes)' : ''} — ${players.size} joueur(s) connecté(s)`
     );
   });
 
@@ -453,6 +551,13 @@ io.on('connection', (socket) => {
 
     player.position = position;
     player.rotationY = rotationY || 0;
+
+    const now = Date.now();
+    player.positionHistory.push({ t: now, position });
+    const cutoff = now - POSITION_HISTORY_MS;
+    while (player.positionHistory.length > 1 && player.positionHistory[0].t < cutoff) {
+      player.positionHistory.shift();
+    }
 
     socket.broadcast.emit('player-moved', {
       id: socket.id,
@@ -489,10 +594,15 @@ io.on('connection', (socket) => {
       maxLength: Math.min(obstacleDistance, 60),
     });
 
-    const targetId = findClosestHit(socket.id, origin, direction, obstacleDistance);
+    const targetId = findClosestHit(socket.id, origin, direction, obstacleDistance, Date.now() - LAG_COMPENSATION_MS);
     if (!targetId) return;
 
     const target = players.get(targetId);
+    // Mode Équipes : le tir touche visuellement (le traceur a déjà été
+    // diffusé juste au-dessus) mais ne fait aucun dégât à un coéquipier —
+    // pas de réduction de bouclier/HP, pas de hit-confirmed, pas de mort.
+    if (isFriendlyFire(shooter, target)) return;
+
     let damage = weaponDamage(equipped.id, equipped.rarity);
     if (target.shield > 0) {
       const absorbed = Math.min(target.shield, damage);
