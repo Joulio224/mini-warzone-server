@@ -12,9 +12,10 @@
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 
-// Toutes les données de la map (collisions, spawns d'équipe, points
-// d'apparition des armes/gilets, lumières d'ambiance) viennent de ce fichier
+// Toutes les données de la map (collisions, spawns d'équipe, lumières
+// d'ambiance) viennent de ce fichier
 // — plus aucune géométrie de salle codée en dur ici. Doit rester identique
 // à src/map-data.json côté client. La géométrie VISIBLE, elle, vient de
 // map.glb (voir src/main.js) — ce fichier ne contient que ce que le rendu
@@ -356,6 +357,48 @@ const io = new Server(httpServer, {
 const players = new Map();
 
 // ---------------------------------------------------------------------------
+// Stuff au sol — armes et gilets qui tombent à la mort d'un joueur (voir
+// dropLoot, appelé depuis killPlayer). Contrairement à l'ancien loot de la
+// map (retiré), rien n'est semé au hasard ni réapprovisionné tout seul : un
+// objet au sol y reste jusqu'à ce que quelqu'un le ramasse, pour toujours
+// s'il le faut.
+//   groundVests   : vestId         -> { position }
+//   groundWeapons : weaponPickupId -> { position, weapon: { id, rarity } }
+// Les gilets se ramassent automatiquement en marchant dessus (voir le
+// handler 'move' plus bas) ; les armes demandent une action du joueur
+// (touche E par défaut, configurable — voir 'collect-weapon' plus bas), pour
+// éviter d'échanger son arme sans le vouloir en traversant le point de mort
+// de quelqu'un en plein combat.
+const groundVests = new Map();
+const groundWeapons = new Map();
+const VEST_PICKUP_RADIUS = 1.1; // ramassage auto : assez court pour ne pas "aimanter" de loin
+const WEAPON_PICKUP_RADIUS = 1.8; // ramassage à la touche E : portée normale d'interaction
+
+// Fait tomber au sol les armes (avec leur rareté réelle — un fusil rouge
+// acheté tombe en fusil rouge, pas en arme générique) et les gilets en
+// réserve non utilisés d'un joueur qui vient de mourir. Appelée tout en haut
+// de killPlayer, avant que son stuff ne soit réinitialisé pour le respawn.
+function dropLoot(victim) {
+  const pos = victim.position;
+
+  victim.weapons.forEach((weapon, slot) => {
+    if (!weapon) return;
+    const id = randomUUID();
+    // léger décalage pour ne pas empiler les deux armes pile au même point
+    const position = { x: pos.x + (slot === 0 ? -0.3 : 0.3), y: pos.y, z: pos.z };
+    groundWeapons.set(id, { position, weapon: { ...weapon } });
+    io.emit('weapon-pickup-spawned', { id, weaponId: weapon.id, rarity: weapon.rarity, position });
+  });
+
+  for (let i = 0; i < victim.vestCount; i++) {
+    const id = randomUUID();
+    const position = { x: pos.x + (i - (victim.vestCount - 1) / 2) * 0.35, y: pos.y, z: pos.z - 0.4 };
+    groundVests.set(id, { position });
+    io.emit('vest-spawned', { id, position });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Détection de tir : test rayon-sphère simple, pas besoin de Three.js côté
 // serveur — juste de la géométrie de base. On garde le point d'impact le
 // plus proche si plusieurs joueurs sont alignés sur le tir.
@@ -432,6 +475,8 @@ function broadcastShieldSteps(id, player) {
 function killPlayer(victimId, killerId) {
   const victim = players.get(victimId);
   if (!victim) return;
+
+  dropLoot(victim); // avant toute réinitialisation : encore le stuff qu'il avait au moment de mourir
 
   victim.alive = false;
   victim.hp = 0;
@@ -511,6 +556,21 @@ io.on('connection', (socket) => {
     }));
     socket.emit('current-players', existingPlayers);
 
+    // ...et le stuff déjà au sol (gilets/armes tombés avant son arrivée).
+    socket.emit(
+      'current-vests',
+      Array.from(groundVests.entries()).map(([id, v]) => ({ id, position: v.position }))
+    );
+    socket.emit(
+      'current-weapon-pickups',
+      Array.from(groundWeapons.entries()).map(([id, w]) => ({
+        id,
+        weaponId: w.weapon.id,
+        rarity: w.weapon.rarity,
+        position: w.position,
+      }))
+    );
+
     // ...puis on l'ajoute et on prévient tout le monde.
     const player = {
       pseudo,
@@ -557,6 +617,24 @@ io.on('connection', (socket) => {
     const cutoff = now - POSITION_HISTORY_MS;
     while (player.positionHistory.length > 1 && player.positionHistory[0].t < cutoff) {
       player.positionHistory.shift();
+    }
+
+    // Ramassage automatique d'un gilet au sol à portée — rien à faire pour
+    // le joueur, juste marcher dessus. On n'en prend qu'un seul par appel de
+    // 'move' (le prochain, à l'appel suivant, quelques ms plus tard) pour ne
+    // jamais dépasser le plafond par erreur si plusieurs sont superposés.
+    if (player.vestCount < player.maxVestSlots) {
+      for (const [vestId, vest] of groundVests) {
+        const dx = player.position.x - vest.position.x;
+        const dy = player.position.y - vest.position.y;
+        const dz = player.position.z - vest.position.z;
+        if (Math.sqrt(dx * dx + dy * dy + dz * dz) > VEST_PICKUP_RADIUS) continue;
+        groundVests.delete(vestId);
+        io.emit('vest-removed', { id: vestId });
+        player.vestCount += 1;
+        io.to(socket.id).emit('your-vest-count', { count: player.vestCount });
+        break;
+      }
     }
 
     socket.broadcast.emit('player-moved', {
@@ -634,6 +712,34 @@ io.on('connection', (socket) => {
     io.to(socket.id).emit('your-vest-count', { count: player.vestCount });
     io.to(socket.id).emit('your-shield', { shield: player.shield });
     broadcastShieldSteps(socket.id, player);
+  });
+
+  // Ramassage d'une arme au sol (touche E, configurable — voir keybinds.js
+  // côté client). `slot` (0 ou 1) est le slot sélectionné côté client au
+  // moment du ramassage, utilisé seulement si le stuff est déjà plein. Comme
+  // pour 'shoot', le client ne peut choisir QUE lequel de ses propres slots
+  // se fait remplacer ; il ne peut ni inventer une arme ni éviter d'en
+  // perdre une, donc pas besoin de s'en méfier davantage.
+  socket.on('collect-weapon', ({ pickupId, slot } = {}) => {
+    const player = players.get(socket.id);
+    const pickup = groundWeapons.get(pickupId);
+    if (!player || !player.alive || !pickup) return;
+
+    const dx = player.position.x - pickup.position.x;
+    const dy = player.position.y - pickup.position.y;
+    const dz = player.position.z - pickup.position.z;
+    if (Math.sqrt(dx * dx + dy * dy + dz * dz) > WEAPON_PICKUP_RADIUS) return;
+
+    groundWeapons.delete(pickupId);
+    io.emit('weapon-pickup-removed', { id: pickupId });
+
+    // S'il reste un slot vide (le 1, puisque le 0 démarre toujours avec le
+    // pistolet), l'arme ramassée le remplit ; sinon (stuff plein) elle
+    // remplace l'arme du slot sélectionné au ramassage — y compris le
+    // pistolet du slot 0, qui n'est donc pas protégé.
+    const targetSlot = player.weapons[1] ? (slot === 0 || slot === 1 ? slot : 0) : 1;
+    player.weapons[targetSlot] = { ...pickup.weapon };
+    io.to(socket.id).emit('your-weapons', { weapons: player.weapons });
   });
 
   // ---------------------------------------------------------------------
