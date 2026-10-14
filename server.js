@@ -472,7 +472,30 @@ function broadcastShieldSteps(id, player) {
   io.emit('player-shield-steps', { id, steps: shieldSteps(player) });
 }
 
-function killPlayer(victimId, killerId) {
+// ---------------------------------------------------------------------------
+// Scores : kills/morts de chaque joueur pour la durée de sa connexion (ils
+// repartent de zéro s'il se reconnecte). Le tableau COMPLET est rediffusé à
+// chaque changement (mort, arrivée, départ) : quelques joueurs, quelques
+// octets — plus simple et plus sûr que d'envoyer des différences.
+// ---------------------------------------------------------------------------
+function scoreboardSnapshot() {
+  return Array.from(players.entries()).map(([id, p]) => ({
+    id,
+    pseudo: p.pseudo,
+    team: p.team,
+    mode: p.mode,
+    kills: p.kills,
+    deaths: p.deaths,
+  }));
+}
+
+function broadcastScoreboard() {
+  io.emit('scoreboard', scoreboardSnapshot());
+}
+
+// weapon : { id, rarity } de l'arme avec laquelle le tir mortel a été tiré
+// (pour le kill feed), ou null.
+function killPlayer(victimId, killerId, weapon = null) {
   const victim = players.get(victimId);
   if (!victim) return;
 
@@ -486,16 +509,33 @@ function killPlayer(victimId, killerId) {
   // pour le reste de la partie, y compris après un respawn.
   broadcastShieldSteps(victimId, victim);
 
-  if (killerId) {
-    const killer = players.get(killerId);
-    if (killer) {
-      killer.money = (killer.money || 0) + KILL_REWARD;
-      io.to(killerId).emit('your-money', { money: killer.money });
-    }
+  victim.deaths += 1;
+  const killer = killerId ? players.get(killerId) : null;
+  if (killer) {
+    killer.kills += 1;
+    killer.money = (killer.money || 0) + KILL_REWARD;
+    io.to(killerId).emit('your-money', { money: killer.money });
   }
 
   io.emit('player-died', { id: victimId, killedBy: killerId || null });
   io.to(victimId).emit('you-died');
+
+  // Kill feed : tout est résolu ici (pseudos, équipes, arme) pour que les
+  // clients n'aient rien à deviner — et n'affichent jamais un id inconnu si
+  // quelqu'un part juste après. L'équipe n'est transmise qu'en mode Équipes :
+  // en solo la couleur d'équipe ne sert qu'au spawn, elle n'a pas de sens
+  // à l'écran.
+  io.emit('kill-feed', {
+    killerId: killer ? killerId : null,
+    killerPseudo: killer ? killer.pseudo : null,
+    killerTeam: killer && killer.mode === 'team' ? killer.team : null,
+    victimId,
+    victimPseudo: victim.pseudo,
+    victimTeam: victim.mode === 'team' ? victim.team : null,
+    weaponId: weapon ? weapon.id : null,
+    rarity: weapon ? weapon.rarity : null,
+  });
+  broadcastScoreboard();
 
   setTimeout(() => {
     if (!players.has(victimId)) return; // parti entre-temps
@@ -590,6 +630,8 @@ io.on('connection', (socket) => {
       vestCount: 0,
       maxVestSlots: MAX_SHIELD_VESTS,
       money: 0,
+      kills: 0,
+      deaths: 0,
       alive: true,
     };
     players.set(socket.id, player);
@@ -599,6 +641,7 @@ io.on('connection', (socket) => {
     socket.emit('your-money', { money: player.money });
 
     socket.broadcast.emit('player-joined', { id: socket.id, pseudo, team, position: spawn, appearance });
+    broadcastScoreboard(); // le nouvel arrivant (à 0-0) apparaît chez tout le monde, et reçoit le tableau
 
     console.log(
       `[+] ${pseudo} (${socket.id}) — équipe ${team}${mode === 'team' ? ' (mode équipes)' : ''} — ${players.size} joueur(s) connecté(s)`
@@ -667,6 +710,7 @@ io.on('connection', (socket) => {
     const obstacleDistance = nearestObstacleDistance(origin, direction);
     socket.broadcast.emit('player-shoot', {
       id: socket.id,
+      weaponId: equipped.id, // pour que chaque arme ait son propre son chez les autres joueurs
       origin,
       direction,
       maxLength: Math.min(obstacleDistance, 60),
@@ -694,7 +738,7 @@ io.on('connection', (socket) => {
     socket.emit('hit-confirmed', { target: targetId });
 
     if (target.hp <= 0) {
-      killPlayer(targetId, socket.id);
+      killPlayer(targetId, socket.id, equipped);
     }
   });
 
@@ -760,6 +804,7 @@ io.on('connection', (socket) => {
     if (!player) return;
     players.delete(socket.id);
     io.emit('player-left', { id: socket.id });
+    broadcastScoreboard();
     console.log(`[-] ${player.pseudo} (${socket.id}) — ${players.size} joueur(s) connecté(s)`);
   });
 });
