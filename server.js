@@ -25,13 +25,13 @@ const mapData = JSON.parse(readFileSync(new URL('./map-data.json', import.meta.u
 const PORT = process.env.PORT || 3001;
 
 const MAX_HP = 100;
-const HIT_RADIUS = 0.35; // calé sur le rayon réel de la capsule visuelle du joueur
-// Hauteurs testées le long du corps (relatives à position.y, qui est la
-// hauteur des yeux) — une approximation simple d'une capsule verticale, sans
-// faire de vraie géométrie de capsule côté serveur. Remplace l'ancienne
-// sphère unique et bien trop large (0.9) qui faisait toucher quelqu'un même
-// en visant à côté de lui.
-const BODY_SAMPLE_OFFSETS = [-1.6, -1.1, -0.6, -0.1, 0.15]; // pieds -> tête
+const HIT_RADIUS = 0.35; // rayon des hitbox du corps
+const HEAD_HIT_RADIUS = 0.25; // correspond à la tête visible (sphère de rayon 0,25)
+const HEADSHOT_MULTIPLIER = 2; // un headshot inflige deux fois les dégâts normaux
+// Centres des hitbox du corps, relatifs à position.y (hauteur des yeux).
+// La hitbox supérieure du corps s'arrête sous la tête pour qu'un tir dans
+// la tête soit reconnu comme un headshot plutôt que comme un tir au corps.
+const BODY_SAMPLE_OFFSETS = [-1.6, -1.1, -0.7]; // pieds -> haut du torse
 const RESPAWN_DELAY_MS = 3000;
 
 // Compensation de latence : un tir teste la position des AUTRES joueurs telle
@@ -443,12 +443,23 @@ function getPositionAtTime(player, t) {
 }
 
 function findClosestHit(shooterId, origin, direction, maxDistance, atTime) {
-  let closestId = null;
+  let closestHit = null;
   let closestDistance = maxDistance;
 
   players.forEach((player, id) => {
     if (id === shooterId || !player.alive) return;
     const rewound = getPositionAtTime(player, atTime);
+
+    // La tête du modèle est centrée à environ -0,05 m par rapport aux yeux.
+    // On teste sa hitbox séparément afin de pouvoir distinguer les headshots.
+    const headDistance = raySphereDistance(
+      origin,
+      direction,
+      { x: rewound.x, y: rewound.y - 0.05, z: rewound.z },
+      HEAD_HIT_RADIUS
+    );
+
+    let bodyDistance = null;
     for (const offsetY of BODY_SAMPLE_OFFSETS) {
       const center = {
         x: rewound.x,
@@ -456,14 +467,24 @@ function findClosestHit(shooterId, origin, direction, maxDistance, atTime) {
         z: rewound.z,
       };
       const dist = raySphereDistance(origin, direction, center, HIT_RADIUS);
-      if (dist !== null && dist < closestDistance) {
-        closestDistance = dist;
-        closestId = id;
+      if (dist !== null && (bodyDistance === null || dist < bodyDistance)) {
+        bodyDistance = dist;
       }
+    }
+
+    // Le headshot est retenu uniquement si la tête est le premier point
+    // touché sur ce joueur ; sinon, le tir compte comme un impact au corps.
+    const isHeadshot = headDistance !== null &&
+      (bodyDistance === null || headDistance <= bodyDistance);
+    const playerDistance = isHeadshot ? headDistance : bodyDistance;
+
+    if (playerDistance !== null && playerDistance < closestDistance) {
+      closestDistance = playerDistance;
+      closestHit = { id, headshot: isHeadshot };
     }
   });
 
-  return closestId;
+  return closestHit;
 }
 
 // Diffusé à TOUT le monde (pas juste au joueur concerné) car l'assombrissement
@@ -588,6 +609,7 @@ io.on('connection', (socket) => {
       id,
       pseudo: p.pseudo,
       team: p.team,
+      mode: p.mode,
       position: p.position,
       rotationY: p.rotationY,
       hp: p.hp,
@@ -640,7 +662,7 @@ io.on('connection', (socket) => {
     socket.emit('your-abilities', { maxVestSlots: player.maxVestSlots });
     socket.emit('your-money', { money: player.money });
 
-    socket.broadcast.emit('player-joined', { id: socket.id, pseudo, team, position: spawn, appearance });
+    socket.broadcast.emit('player-joined', { id: socket.id, pseudo, team, mode, position: spawn, appearance });
     broadcastScoreboard(); // le nouvel arrivant (à 0-0) apparaît chez tout le monde, et reçoit le tableau
 
     console.log(
@@ -716,9 +738,10 @@ io.on('connection', (socket) => {
       maxLength: Math.min(obstacleDistance, 60),
     });
 
-    const targetId = findClosestHit(socket.id, origin, direction, obstacleDistance, Date.now() - LAG_COMPENSATION_MS);
-    if (!targetId) return;
+    const hit = findClosestHit(socket.id, origin, direction, obstacleDistance, Date.now() - LAG_COMPENSATION_MS);
+    if (!hit) return;
 
+    const targetId = hit.id;
     const target = players.get(targetId);
     // Mode Équipes : le tir touche visuellement (le traceur a déjà été
     // diffusé juste au-dessus) mais ne fait aucun dégât à un coéquipier —
@@ -726,6 +749,7 @@ io.on('connection', (socket) => {
     if (isFriendlyFire(shooter, target)) return;
 
     let damage = weaponDamage(equipped.id, equipped.rarity);
+    if (hit.headshot) damage = Math.round(damage * HEADSHOT_MULTIPLIER);
     if (target.shield > 0) {
       const absorbed = Math.min(target.shield, damage);
       target.shield -= absorbed;
@@ -735,7 +759,7 @@ io.on('connection', (socket) => {
     }
     target.hp = Math.max(0, target.hp - damage);
     io.to(targetId).emit('your-hp', { hp: target.hp });
-    socket.emit('hit-confirmed', { target: targetId });
+    socket.emit('hit-confirmed', { target: targetId, headshot: hit.headshot, damage });
 
     if (target.hp <= 0) {
       killPlayer(targetId, socket.id, equipped);
