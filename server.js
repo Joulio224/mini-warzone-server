@@ -236,7 +236,270 @@ function isFriendlyFire(shooter, target) {
 // "floor" (sol du balcon) ne bloque un tir qu'à sa hauteur ; les murs/caisses
 // (type "wall") bloquent sur toute leur hauteur — voir rayBoxDistance juste
 // en dessous, qui traite les deux de la même façon (un simple test de boîte).
-const OBSTACLES = mapData.colliders;
+function multiplyMatrices(a, b) {
+  const out = new Array(16).fill(0);
+
+  for (let col = 0; col < 4; col++) {
+    for (let row = 0; row < 4; row++) {
+      for (let k = 0; k < 4; k++) {
+        out[col * 4 + row] += a[k * 4 + row] * b[col * 4 + k];
+      }
+    }
+  }
+
+  return out;
+}
+
+function nodeLocalMatrix(node) {
+  if (node.matrix && node.matrix.length === 16) {
+    return node.matrix;
+  }
+
+  const [x, y, z, w] = node.rotation || [0, 0, 0, 1];
+  const [sx, sy, sz] = node.scale || [1, 1, 1];
+  const [tx, ty, tz] = node.translation || [0, 0, 0];
+
+  return [
+    (1 - 2 * (y * y + z * z)) * sx,
+    (2 * (x * y + z * w)) * sx,
+    (2 * (x * z - y * w)) * sx,
+    0,
+
+    (2 * (x * y - z * w)) * sy,
+    (1 - 2 * (x * x + z * z)) * sy,
+    (2 * (y * z + x * w)) * sy,
+    0,
+
+    (2 * (x * z + y * w)) * sz,
+    (2 * (y * z - x * w)) * sz,
+    (1 - 2 * (x * x + y * y)) * sz,
+    0,
+
+    tx, ty, tz, 1,
+  ];
+}
+
+function transformPoint(matrix, x, y, z) {
+  return {
+    x: matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12],
+    y: matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13],
+    z: matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14],
+  };
+}
+
+function loadColliderBoxesFromGLB() {
+  const path = new URL('../mini-warzone/public/assets/map-colliders.glb', import.meta.url);
+  const buffer = readFileSync(path);
+
+  if (buffer.toString('ascii', 0, 4) !== 'glTF') {
+    throw new Error('Signature GLB invalide : les 4 premiers octets ne sont pas "glTF".');
+  }
+
+  const version = buffer.readUInt32LE(4);
+  if (version !== 2) {
+    throw new Error(`Version GLB non prise en charge : ${version}. Version attendue : 2.`);
+  }
+
+  const declaredLength = buffer.readUInt32LE(8);
+  if (declaredLength > buffer.length) {
+    throw new Error(
+      `Fichier GLB incomplet : taille annoncée ${declaredLength}, taille reçue ${buffer.length}.`
+    );
+  }
+
+  let offset = 12;
+  let gltf = null;
+  let binaryChunk = null;
+
+  while (offset + 8 <= Math.min(declaredLength, buffer.length)) {
+    const chunkLength = buffer.readUInt32LE(offset);
+    const chunkType = buffer.readUInt32LE(offset + 4);
+    const start = offset + 8;
+    const end = start + chunkLength;
+
+    if (end > buffer.length) {
+      throw new Error(`Chunk GLB tronqué à l'octet ${offset}.`);
+    }
+
+    if (chunkType === 0x4E4F534A) {
+      gltf = JSON.parse(buffer.toString('utf8', start, end));
+    } else if (chunkType === 0x004E4942) {
+      binaryChunk = buffer.subarray(start, end);
+    }
+
+    offset = end;
+  }
+
+  if (!gltf) throw new Error('Le fichier GLB ne contient pas de chunk JSON.');
+  if (!binaryChunk) throw new Error('Le fichier GLB ne contient pas de données BIN intégrées.');
+
+  const boxes = [];
+  const nodes = gltf.nodes || [];
+  const meshes = gltf.meshes || [];
+  const accessors = gltf.accessors || [];
+  const bufferViews = gltf.bufferViews || [];
+
+  function readPosition(accessorIndex) {
+    const accessor = accessors[accessorIndex];
+
+    if (!accessor) {
+      throw new Error(`Accessor POSITION introuvable : ${accessorIndex}.`);
+    }
+
+    if (accessor.componentType !== 5126 || accessor.type !== 'VEC3') {
+      throw new Error(
+        `Accessor POSITION ${accessorIndex} non pris en charge : componentType=${accessor.componentType}, type=${accessor.type}. POSITION doit être FLOAT VEC3.`
+      );
+    }
+
+    const view = bufferViews[accessor.bufferView];
+
+    if (!view || view.buffer !== undefined && view.buffer !== 0) {
+      throw new Error(`BufferView invalide pour l'accessor ${accessorIndex}.`);
+    }
+
+    const start = (view.byteOffset || 0) + (accessor.byteOffset || 0);
+    const stride = view.byteStride || 12;
+    const data = new DataView(
+      binaryChunk.buffer,
+      binaryChunk.byteOffset,
+      binaryChunk.byteLength
+    );
+    const points = [];
+
+    for (let i = 0; i < accessor.count; i++) {
+      const p = start + i * stride;
+
+      if (p + 12 > binaryChunk.length) {
+        throw new Error(`Positions tronquées dans l'accessor ${accessorIndex}, vertex ${i}.`);
+      }
+
+      points.push([
+        data.getFloat32(p, true),
+        data.getFloat32(p + 4, true),
+        data.getFloat32(p + 8, true),
+      ]);
+    }
+
+    return points;
+  }
+
+  function visitNode(nodeIndex, parentMatrix) {
+    const node = nodes[nodeIndex];
+
+    if (!node) {
+      throw new Error(`Node GLB introuvable : ${nodeIndex}.`);
+    }
+
+    const worldMatrix = multiplyMatrices(parentMatrix, nodeLocalMatrix(node));
+
+    if (node.mesh !== undefined) {
+      const mesh = meshes[node.mesh];
+
+      if (!mesh) {
+        throw new Error(`Mesh GLB introuvable : ${node.mesh}.`);
+      }
+
+      for (const primitive of mesh.primitives || []) {
+        if (primitive.attributes?.POSITION === undefined) continue;
+
+        const points = readPosition(primitive.attributes.POSITION);
+
+        if (!points.length) continue;
+
+        const first = transformPoint(
+          worldMatrix, points[0][0], points[0][1], points[0][2]
+        );
+
+        const box = {
+          minX: first.x, maxX: first.x,
+          minY: first.y, maxY: first.y,
+          minZ: first.z, maxZ: first.z,
+        };
+
+        for (let i = 1; i < points.length; i++) {
+          const p = transformPoint(
+            worldMatrix, points[i][0], points[i][1], points[i][2]
+          );
+
+          box.minX = Math.min(box.minX, p.x);
+          box.maxX = Math.max(box.maxX, p.x);
+          box.minY = Math.min(box.minY, p.y);
+          box.maxY = Math.max(box.maxY, p.y);
+          box.minZ = Math.min(box.minZ, p.z);
+          box.maxZ = Math.max(box.maxZ, p.z);
+        }
+
+        boxes.push(box);
+      }
+    }
+
+    for (const childIndex of node.children || []) {
+      visitNode(childIndex, worldMatrix);
+    }
+  }
+
+  const identity = [
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1,
+  ];
+
+  const scenes = gltf.scenes || [];
+  const activeScene = scenes[gltf.scene || 0];
+
+  if (activeScene?.nodes?.length) {
+    for (const nodeIndex of activeScene.nodes) {
+      visitNode(nodeIndex, identity);
+    }
+  } else {
+    // Secours pour un GLB sans scène active définie.
+    const childNodes = new Set();
+    for (const node of nodes) {
+      for (const child of node.children || []) childNodes.add(child);
+    }
+
+    nodes.forEach((node, index) => {
+      if (!childNodes.has(index)) visitNode(index, identity);
+    });
+  }
+
+  if (boxes.length === 0) {
+    throw new Error(
+      'Aucune géométrie POSITION exploitable trouvée dans map-colliders.glb.'
+    );
+  }
+
+  console.info(
+    `[MAP-COLLIDERS] Serveur : ${boxes.length} boîte(s) de collision calculée(s) depuis map-colliders.glb.`
+  );
+
+  return boxes;
+}
+
+let OBSTACLES;
+
+try {
+  OBSTACLES = loadColliderBoxesFromGLB();
+} catch (error) {
+  console.error(
+    '[MAP-COLLIDERS] ÉCHEC DU CHARGEMENT SERVEUR de public/asset/map-colliders.glb :',
+    error
+  );
+
+  console.warn(
+    '[MAP-COLLIDERS] Utilisation temporaire de map-data.json. Les tirs risquent de ne pas correspondre à la nouvelle map.'
+  );
+
+  OBSTACLES = mapData.colliders || [];
+
+  if (!OBSTACLES.length) {
+    console.error(
+      '[MAP-COLLIDERS] ATTENTION : aucun obstacle de secours disponible. Les tirs ne seront pas bloqués par les murs.'
+    );
+  }
+}
 
 // Distance d'intersection rayon/boîte (test des "tranches" standard). Rend
 // null si le rayon ne touche pas la boîte, sinon la distance du premier point
