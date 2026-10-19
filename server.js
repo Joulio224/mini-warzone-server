@@ -181,7 +181,7 @@ function tryPurchase(socket, player, itemId) {
   }
 }
 
-const TEAMS = ['red', 'blue'];
+const TEAMS = ['red', 'blue', 'yellow', 'green'];
 
 // Doit rester identique à EMOJI_FACES dans src/appearance.js — le serveur ne
 // fait confiance à aucune valeur envoyée par le client : couleur hors format
@@ -214,7 +214,7 @@ function sanitizeGroupId(input) {
 // mode ne vaut vraiment 'team' que si une équipe valide l'accompagne, sinon
 // on retombe silencieusement sur 'solo' (comportement inchangé).
 function sanitizeTeamChoice(input) {
-  return input === 'red' || input === 'blue' ? input : null;
+  return TEAMS.includes(input) ? input : null;
 }
 function sanitizeMode(input, team) {
   return input === 'team' && team ? 'team' : 'solo';
@@ -593,11 +593,11 @@ function pickTeamSpawn(team, groupId) {
 // équilibrage), et le mode Équipes + l'assignation manuelle restent le
 // moyen explicite de mettre tout un groupe du même côté.
 function assignTeam() {
-  const counts = { red: 0, blue: 0 };
+  const counts = Object.fromEntries(TEAMS.map((team) => [team, 0]));
   players.forEach((p) => {
-    counts[p.team] = (counts[p.team] || 0) + 1;
+    if (Object.hasOwn(counts, p.team)) counts[p.team] += 1;
   });
-  return counts.red <= counts.blue ? 'red' : 'blue';
+  return TEAMS.reduce((least, team) => counts[team] < counts[least] ? team : least, TEAMS[0]);
 }
 
 const httpServer = createServer((req, res) => {
