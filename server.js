@@ -105,7 +105,13 @@ const WEAPON_DEFS = {
     spread: { hip: 0.055, aim: 0.04 }, basePrice: 120, slot: 1,
     falloff: { start: 7, end: 28, min: 0.25 },
   },
-  sniper: { baseDamage: 70, cooldown: 1.3, magSize: 5, reloadTime: 2.8, pellets: 1, spread: { hip: 0.06, aim: 0 }, basePrice: 150, slot: 1 },
+  sniper: {
+    baseDamage: 70, cooldown: 1.3, magSize: 5, reloadTime: 2.8, pellets: 1, spread: { hip: 0.06, aim: 0 }, basePrice: 150, slot: 1,
+    // Chute de la balle (voir bulletOffsetY) : vitesse de sortie en m/s et distance de réglage
+    // en m (la balle coupe la ligne de visée à cette distance, comme une lunette réglée).
+    ballistics: { speed: 350, zero: 50 },
+    range: 250, // portée max de la balle (m) : la map fait ~150 m de large
+  },
 };
 const WEAPON_ID_PATTERN = Object.keys(WEAPON_DEFS).join('|');
 const DEFAULT_WEAPON_ID = 'pistol';
@@ -122,9 +128,6 @@ function makeWeapon(weaponId, rarity = 'gray') {
 function weaponDamage(weaponId, rarity) {
   return Math.round(weaponDef(weaponId).baseDamage * rarityDamageMultiplier(rarity));
 }
-function weaponCooldown(weaponId) {
-  return weaponDef(weaponId).cooldown;
-}
 // Fraction des dégâts conservée à `distance` mètres pour une arme à
 // atténuation (fusil à pompe) ; 1 pour les autres.
 function falloffFactor(falloff, distance) {
@@ -138,10 +141,8 @@ function falloffFactor(falloff, distance) {
 // dans un disque de dispersion autour de sa visée ; le serveur ne vérifie que le
 // PLAFOND (hanche, en l'air, plein "bloom"), pour qu'un client modifié ne puisse
 // pas envoyer des plombs en dehors de ce que l'arme permet.
-const SPREAD_AIR_MULT = 2.2;
-const SPREAD_BLOOM_FACTOR = 0.8;
-const BLOOM_MAX = 1.5;
-const SPREAD_CAP_SAFETY = 3.6; // >= SPREAD_AIR_MULT + SPREAD_BLOOM_FACTOR * BLOOM_MAX (= 3,4), avec marge
+// (constantes du client : multiplicateur en l'air 2,2 + "bloom" 0,8 × 1,5 max = 3,4)
+const SPREAD_CAP_SAFETY = 3.6; // plafond de dispersion = 3,4 × la dispersion hanche de l'arme, avec une petite marge
 function maxSpreadCosine(def) {
   const radius = def.spread.hip * SPREAD_CAP_SAFETY + 0.002;
   return Math.cos(Math.atan(radius));
@@ -889,6 +890,66 @@ function getPositionAtTime(player, t) {
   return player.position;
 }
 
+// ---------------------------------------------------------------------------
+// Balistique (sniper) — mêmes constantes et même formule que src/weapons.js.
+// Le tir reste instantané (pas de temps de vol, donc pas de "lead" à prévoir sur
+// une cible qui bouge), mais la balle suit une courbe : à s mètres de la bouche,
+// elle est décalée verticalement de bulletOffsetY(s) par rapport à la visée.
+// ---------------------------------------------------------------------------
+const BALLISTIC_GRAVITY = 9.81;
+const BALLISTIC_STEP = 10; // la courbe est découpée en segments droits de 10 m pour les tests
+const DEFAULT_RANGE = 60;
+
+function bulletOffsetY(ballistics, s) {
+  if (!ballistics) return 0;
+  const zeroRise = (0.5 * BALLISTIC_GRAVITY * ballistics.zero) / (ballistics.speed * ballistics.speed);
+  const drop = 0.5 * BALLISTIC_GRAVITY * (s / ballistics.speed) * (s / ballistics.speed);
+  return zeroRise * s - drop;
+}
+
+// Suit un tir depuis `origin` dans la direction `dir` (déjà normalisée) : renvoie
+//   maxLength : distance (m, le long de la visée) où la balle s'arrête (mur, joueur touché, ou portée max)
+//   hit       : { id, headshot, distance } ou null — distance mesurée le long du tir
+// Les armes sans `ballistics` gardent exactement l'ancien comportement (ligne droite).
+function traceShotPath(shooterId, origin, dir, def, atTime) {
+  if (!def.ballistics) {
+    const obstacleDistance = nearestObstacleDistance(origin, dir);
+    return {
+      maxLength: Math.min(obstacleDistance, DEFAULT_RANGE),
+      hit: findClosestHit(shooterId, origin, dir, obstacleDistance, atTime),
+    };
+  }
+
+  const range = def.range ?? DEFAULT_RANGE;
+  let s0 = 0;
+  let prev = { x: origin.x, y: origin.y, z: origin.z };
+  while (s0 < range) {
+    const s1 = Math.min(range, s0 + BALLISTIC_STEP);
+    const next = {
+      x: origin.x + dir.x * s1,
+      y: origin.y + dir.y * s1 + bulletOffsetY(def.ballistics, s1),
+      z: origin.z + dir.z * s1,
+    };
+    const dx = next.x - prev.x;
+    const dy = next.y - prev.y;
+    const dz = next.z - prev.z;
+    const len = Math.hypot(dx, dy, dz);
+    if (len < 1e-6) break;
+    const segDir = { x: dx / len, y: dy / len, z: dz / len };
+
+    const obstacle = Math.min(nearestObstacleDistance(prev, segDir), len);
+    const hit = findClosestHit(shooterId, prev, segDir, obstacle, atTime);
+    if (hit) {
+      // petite marge pour que le traceur chez les autres joueurs arrive jusqu'au corps touché
+      return { maxLength: s0 + hit.distance + 0.5, hit: { ...hit, distance: s0 + hit.distance } };
+    }
+    if (obstacle < len) return { maxLength: s0 + obstacle, hit: null };
+    prev = next;
+    s0 = s1;
+  }
+  return { maxLength: range, hit: null };
+}
+
 function findClosestHit(shooterId, origin, direction, maxDistance, atTime) {
   let closestHit = null;
   let closestDistance = maxDistance;
@@ -1400,10 +1461,10 @@ io.on('connection', (socket) => {
     const tracers = [];
     const rewindTime = now - LAG_COMPENSATION_MS;
     pellets.forEach((dir) => {
-      const obstacleDistance = nearestObstacleDistance(origin, dir);
-      tracers.push({ direction: dir, maxLength: Math.min(obstacleDistance, 60) });
+      const path = traceShotPath(socket.id, origin, dir, def, rewindTime);
+      tracers.push({ direction: dir, maxLength: path.maxLength });
 
-      const hit = findClosestHit(socket.id, origin, dir, obstacleDistance, rewindTime);
+      const hit = path.hit;
       if (!hit) return;
       const target = players.get(hit.id);
       // Mode Équipes : le tir touche visuellement (le traceur est diffusé
