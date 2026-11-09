@@ -12,7 +12,11 @@
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { readFileSync } from 'node:fs';
+import { createAdminTools } from './admin-tools.js';
 import { randomUUID } from 'node:crypto';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // Toutes les données de la map (collisions, spawns d'équipe, lumières
 // d'ambiance) viennent de ce fichier
@@ -21,6 +25,20 @@ import { randomUUID } from 'node:crypto';
 // map.glb (voir src/main.js) — ce fichier ne contient que ce que le rendu
 // 3D ne peut pas déduire tout seul (boîtes de collision, points de jeu).
 const mapData = JSON.parse(readFileSync(new URL('./map-data.json', import.meta.url)));
+
+
+// Authentification Firebase côté serveur. Sur Suga, définir FIREBASE_SERVICE_ACCOUNT_JSON
+// avec le JSON complet du compte de service Firebase (jamais dans le dépôt Git).
+const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+if (!serviceAccountRaw) {
+  throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON manquant : configure le compte de service Firebase dans les variables d’environnement du serveur.');
+}
+let serviceAccount;
+try { serviceAccount = JSON.parse(serviceAccountRaw); }
+catch { throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON doit contenir un JSON valide.'); }
+const firebaseAdminApp = getApps()[0] || initializeApp({ credential: cert(serviceAccount) });
+const firebaseAuth = getAuth(firebaseAdminApp);
+const firebaseDb = getFirestore(firebaseAdminApp);
 
 const PORT = process.env.PORT || 3001;
 
@@ -717,6 +735,48 @@ const io = new Server(httpServer, {
   },
 });
 
+// Auth Firebase vérifiée avant toute connexion au jeu : les commandes admin
+// ne reposent jamais sur une valeur fournie par le navigateur.
+// Message à afficher si ce compte est actuellement sanctionné, sinon null.
+// Format de sanctions/{uid} : voir admin.js côté client (type 'ban' | 'suspend',
+// createdAt, durationMs pour une suspension).
+async function activeSanctionMessage(uid) {
+  try {
+    const doc = await firebaseDb.collection('sanctions').doc(uid).get();
+    if (!doc.exists) return null;
+    const sanction = doc.data() || {};
+    if (sanction.type === 'ban') return 'Compte banni.';
+    if (sanction.type === 'suspend') {
+      const createdMs = sanction.createdAt?.toMillis?.() ?? 0; // horloge du serveur Firestore
+      if (createdMs + (Number(sanction.durationMs) || 0) > Date.now()) return 'Compte suspendu.';
+    }
+    return null;
+  } catch (error) {
+    console.error('[SANCTION] Vérification impossible :', error.message);
+    return null; // en cas de panne Firestore on laisse jouer plutôt que de bloquer tout le monde
+  }
+}
+
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth?.idToken;
+    if (!token) return next(new Error('Authentification Firebase requise.'));
+    const decoded = await firebaseAuth.verifyIdToken(token);
+    const userDoc = await firebaseDb.collection('users').doc(decoded.uid).get();
+    socket.data.firebaseUid = decoded.uid;
+    socket.data.isAdmin = String(userDoc.data()?.admin).toLowerCase() === 'true';
+    // Un compte banni ou suspendu ne peut pas rejoindre la partie, même avec un
+    // client modifié qui ignorerait l'écran de sanction (voir sanctions/{uid}).
+    const blocked = await activeSanctionMessage(decoded.uid);
+    if (blocked && !socket.data.isAdmin) return next(new Error(blocked));
+    socket.data.pseudo = userDoc.data()?.pseudo || decoded.name || 'Joueur';
+    next();
+  } catch (error) {
+    console.warn('[AUTH] Connexion refusée :', error.message);
+    next(new Error('Authentification Firebase invalide.'));
+  }
+});
+
 // socket.id -> { pseudo, position, rotationY, hp, shield, weapons, vestCount,
 //                maxVestSlots, money, alive }
 const players = new Map();
@@ -798,6 +858,26 @@ function inPickupReach(player, pos, radius) {
 // acheté tombe en fusil rouge, pas en arme générique) et les gilets en
 // réserve non utilisés d'un joueur qui vient de mourir. Appelée tout en haut
 // de killPlayer, avant que son stuff ne soit réinitialisé pour le respawn.
+// Fait tomber une arme au sol depuis (x, fromY, z) : calcule la chute, lance le
+// minuteur d'une minute et prévient tous les clients. Sert à la mort d'un joueur
+// et à la commande admin « déposer une arme ».
+function spawnGroundWeapon(weapon, x, fromY, z) {
+  const now = Date.now();
+  const id = randomUUID();
+  const landing = lootLanding(x, fromY, z);
+  const item = { position: landing.position, weapon: { ...weapon }, fromY: landing.fromY };
+  armLootTimer(item, now + landing.fallMs);
+  groundWeapons.set(id, item);
+  io.emit('weapon-pickup-spawned', {
+    id,
+    weaponId: weapon.id,
+    rarity: weapon.rarity,
+    position: item.position,
+    ...lootTimingPayload(item, now),
+  });
+  return id;
+}
+
 function dropLoot(victim) {
   const pos = victim.position;
   const now = Date.now();
@@ -805,19 +885,8 @@ function dropLoot(victim) {
 
   victim.weapons.forEach((weapon, slot) => {
     if (!weapon) return;
-    const id = randomUUID();
     // léger décalage pour ne pas empiler les deux armes pile au même point
-    const landing = lootLanding(pos.x + (slot === 0 ? -0.3 : 0.3), startY, pos.z);
-    const item = { position: landing.position, weapon: { ...weapon }, fromY: landing.fromY };
-    armLootTimer(item, now + landing.fallMs);
-    groundWeapons.set(id, item);
-    io.emit('weapon-pickup-spawned', {
-      id,
-      weaponId: weapon.id,
-      rarity: weapon.rarity,
-      position: item.position,
-      ...lootTimingPayload(item, now),
-    });
+    spawnGroundWeapon(weapon, pos.x + (slot === 0 ? -0.3 : 0.3), startY, pos.z);
   });
 
   for (let i = 0; i < victim.vestCount; i++) {
@@ -955,7 +1024,7 @@ function findClosestHit(shooterId, origin, direction, maxDistance, atTime) {
   let closestDistance = maxDistance;
 
   players.forEach((player, id) => {
-    if (id === shooterId || !player.alive) return;
+    if (id === shooterId || !player.alive || player.invisible) return;
     const rewound = getPositionAtTime(player, atTime);
 
     // La tête du modèle est centrée à environ -0,05 m par rapport aux yeux.
@@ -1079,7 +1148,10 @@ function finishReload(socketId) {
 // ---------------------------------------------------------------------------
 function dealDamage(attackerId, targetId, amount, { headshot = false, weapon = null, source = null } = {}) {
   const target = players.get(targetId);
-  if (!target || !target.alive) return;
+  if (!target || !target.alive || target.godmode) return; // godmode : mode admin « insensible aux dégâts »
+  // Mode admin « tue en un tir » : le tireur fait assez de dégâts pour passer outre le bouclier
+  const attacker = attackerId ? players.get(attackerId) : null;
+  if (attacker?.oneShot && attackerId !== targetId) amount = target.hp + target.shield + 1;
   const total = Math.round(amount);
   if (total <= 0) return;
 
@@ -1240,25 +1312,65 @@ function killPlayer(victimId, killerId, weapon = null) {
     rarity: weapon ? weapon.rarity : null,
   });
   broadcastScoreboard();
+  broadcastAdminPlayers();
 
-  setTimeout(() => {
-    if (!players.has(victimId)) return; // parti entre-temps
-    const { position: spawn, spawnIndex } = pickTeamSpawn(victim.team, victim.groupId);
-    victim.alive = true;
-    victim.hp = MAX_HP;
-    victim.position = spawn;
-    // Repart de zéro : sans ça, juste après le respawn, un rewind pourrait
-    // encore remonter à l'ancienne position (avant la mort), qui n'a plus
-    // rien à voir avec où le joueur vient d'apparaître.
-    victim.positionHistory = [{ t: Date.now(), position: spawn }];
-    victim.spawnIndex = spawnIndex;
-    victim.weapons = [makeWeapon('pistol', 'gray'), null]; // on repart avec juste le pistolet, rareté gris, chargeur plein
-    victim.vestCount = 0;
-    io.to(victimId).emit('you-respawned', { position: spawn });
-    io.to(victimId).emit('your-weapons', { weapons: victim.weapons });
-    io.to(victimId).emit('your-vest-count', { count: victim.vestCount });
-    io.emit('player-respawned', { id: victimId, position: spawn });
-  }, RESPAWN_DELAY_MS);
+  clearTimeout(victim.respawnTimer);
+  victim.respawnTimer = setTimeout(() => respawnPlayer(victimId), RESPAWN_DELAY_MS);
+}
+
+// Ramène un joueur mort à la vie à son point de départ (après RESPAWN_DELAY_MS,
+// ou tout de suite sur ordre d'un admin).
+function respawnPlayer(victimId) {
+  const victim = players.get(victimId);
+  if (!victim || victim.alive) return; // parti entre-temps, ou déjà ressuscité
+  clearTimeout(victim.respawnTimer);
+  const { position: spawn, spawnIndex } = pickTeamSpawn(victim.team, victim.groupId);
+  victim.alive = true;
+  victim.hp = MAX_HP;
+  victim.position = spawn;
+  // Repart de zéro : sans ça, juste après le respawn, un rewind pourrait
+  // encore remonter à l'ancienne position (avant la mort), qui n'a plus
+  // rien à voir avec où le joueur vient d'apparaître.
+  resetPlayerHistory(victim);
+  victim.spawnIndex = spawnIndex;
+  victim.weapons = [makeWeapon('pistol', 'gray'), null]; // on repart avec juste le pistolet, rareté gris, chargeur plein
+  victim.vestCount = 0;
+  io.to(victimId).emit('you-respawned', { position: spawn });
+  io.to(victimId).emit('your-weapons', { weapons: victim.weapons });
+  io.to(victimId).emit('your-vest-count', { count: victim.vestCount });
+  if (!victim.invisible) io.emit('player-respawned', { id: victimId, position: spawn });
+  broadcastAdminPlayers();
+}
+
+function resetPlayerHistory(player) {
+  player.positionHistory = [{ t: Date.now(), position: player.position }];
+}
+
+// Panneau d'administration : toutes les commandes sont dans admin-tools.js
+// (créé juste avant io.on('connection') pour que tout ce qu'il utilise existe).
+const adminTools = createAdminTools({
+  io,
+  players,
+  groundWeapons,
+  groundVests,
+  firebaseDb,
+  WEAPON_DEFS,
+  RARITIES,
+  GRENADE_DEFS,
+  MAX_HP,
+  makeWeapon,
+  killPlayer,
+  respawnPlayer,
+  broadcastScoreboard,
+  broadcastShieldSteps,
+  maxShieldFor,
+  spawnGroundWeapon,
+  groundHeightAt,
+  pickTeamSpawn,
+  resetPlayerHistory,
+});
+function broadcastAdminPlayers() {
+  adminTools.broadcastPlayers();
 }
 
 io.on('connection', (socket) => {
@@ -1301,6 +1413,11 @@ io.on('connection', (socket) => {
       groupId: p.groupId,
     }));
     socket.emit('current-players', existingPlayers);
+    players.forEach((p, id) => {
+      if (p.invisible) socket.emit('player-hidden', { id, hidden: true }); // admins invisibles : on ne les voit pas
+    });
+    const timeOverride = adminTools.getTimeOverride();
+    if (timeOverride !== null) socket.emit('admin-time', { phase: timeOverride }); // heure imposée par un admin
 
     // ...et le stuff déjà au sol (gilets/armes tombés avant son arrivée).
     socket.emit(
@@ -1320,6 +1437,8 @@ io.on('connection', (socket) => {
 
     // ...puis on l'ajoute et on prévient tout le monde.
     const player = {
+      uid: socket.data.firebaseUid,
+      isAdmin: socket.data.isAdmin,
       pseudo,
       team,
       mode,
@@ -1344,6 +1463,15 @@ io.on('connection', (socket) => {
       kills: 0,
       deaths: 0,
       alive: true,
+      godmode: false,
+      noclip: false,
+      fly: false,
+      invisible: false,
+      infiniteAmmo: false,
+      oneShot: false,
+      frozen: false,
+      speedMultiplier: 1,
+      respawnTimer: null,
     };
     players.set(socket.id, player);
     socket.emit('your-weapons', { weapons: player.weapons });
@@ -1354,15 +1482,19 @@ io.on('connection', (socket) => {
 
     socket.broadcast.emit('player-joined', { id: socket.id, pseudo, team, mode, position: spawn, appearance, groupId });
     broadcastScoreboard(); // le nouvel arrivant (à 0-0) apparaît chez tout le monde, et reçoit le tableau
+    broadcastAdminPlayers();
+    adminTools.sendPlayers(socket);
 
     console.log(
       `[+] ${pseudo} (${socket.id}) — équipe ${team}${mode === 'team' ? ' (mode équipes)' : ''} — ${players.size} joueur(s) connecté(s)`
     );
   });
 
+  adminTools.registerSocket(socket);
+
   socket.on('move', ({ position, rotationY } = {}) => {
     const player = players.get(socket.id);
-    if (!player || !player.alive || !position) return;
+    if (!player || !player.alive || !position || player.frozen) return;
 
     player.position = position;
     player.rotationY = rotationY || 0;
@@ -1389,11 +1521,13 @@ io.on('connection', (socket) => {
       }
     }
 
-    socket.broadcast.emit('player-moved', {
-      id: socket.id,
-      position: player.position,
-      rotationY: player.rotationY,
-    });
+    if (!player.invisible) {
+      socket.broadcast.emit('player-moved', {
+        id: socket.id,
+        position: player.position,
+        rotationY: player.rotationY,
+      });
+    }
   });
 
   // Le client envoie un NUMÉRO DE SLOT (0 = arme 1, 1 = arme 2), jamais un
@@ -1430,7 +1564,7 @@ io.on('connection', (socket) => {
       return;
     }
     shooter.lastShotAt = now;
-    equipped.ammo -= 1;
+    if (!shooter.infiniteAmmo) equipped.ammo -= 1; // mode admin : munitions illimitées
     socket.emit('your-ammo', { slot, ammo: equipped.ammo });
 
     // L'origine du tir doit rester près de la dernière position connue du
@@ -1646,6 +1780,7 @@ io.on('connection', (socket) => {
     players.delete(socket.id);
     io.emit('player-left', { id: socket.id });
     broadcastScoreboard();
+    broadcastAdminPlayers();
     console.log(`[-] ${player.pseudo} (${socket.id}) — ${players.size} joueur(s) connecté(s)`);
   });
 });
