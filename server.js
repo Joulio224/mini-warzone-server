@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Serveur temps réel Mini Warzone (Socket.io)
+// Serveur temps réel BulletGrounds (Socket.io)
 // ---------------------------------------------------------------------------
 // Rôle : synchroniser les positions des joueurs, les tirs et la vie entre
 // tous les clients connectés. Ne gère PAS les comptes/amis/groupes (ça,
@@ -11,12 +11,12 @@
 // 2e terminal), pendant que le client tourne sur http://localhost:5173.
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { createAdminTools } from './admin-tools.js';
 import { randomUUID } from 'node:crypto';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 // Toutes les données de la map (collisions, spawns d'équipe, lumières
 // d'ambiance) viennent de ce fichier
@@ -408,7 +408,19 @@ function transformPoint(matrix, x, y, z) {
 }
 
 function loadColliderBoxesFromGLB() {
-  const path = new URL('../mini-warzone/public/assets/map-colliders.glb', import.meta.url);
+  // Le fichier doit être DÉPLOYÉ avec le serveur : copie public/assets/map-colliders.glb du client
+  // à côté de server.js (et refais la copie à chaque changement de map, les deux doivent être
+  // identiques). Les autres chemins servent seulement au développement en local.
+  const candidates = [
+    './map-colliders.glb',
+    './public/assets/map-colliders.glb',
+    '../BulletGrounds/public/assets/map-colliders.glb',
+    '../mini-warzone/public/assets/map-colliders.glb',
+  ].map((relative) => new URL(relative, import.meta.url));
+  const path = candidates.find((url) => existsSync(url));
+  if (!path) {
+    throw new Error(`map-colliders.glb introuvable. Chemins essayés : ${candidates.map((url) => url.pathname).join(', ')}`);
+  }
   const buffer = readFileSync(path);
 
   if (buffer.toString('ascii', 0, 4) !== 'glTF') {
@@ -604,8 +616,8 @@ try {
   OBSTACLES = loadColliderBoxesFromGLB();
 } catch (error) {
   console.error(
-    '[MAP-COLLIDERS] ÉCHEC DU CHARGEMENT SERVEUR de public/asset/map-colliders.glb :',
-    error
+    '[MAP-COLLIDERS] ÉCHEC DU CHARGEMENT SERVEUR de map-colliders.glb :',
+    error.message
   );
 
   console.warn(
@@ -720,9 +732,187 @@ function assignTeam() {
   return TEAMS.reduce((least, team) => counts[team] < counts[least] ? team : least, TEAMS[0]);
 }
 
-const httpServer = createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-  res.end('Mini Warzone — serveur temps réel OK');
+// ---------------------------------------------------------------------------
+// RGPD — suppression complète des données et purge des comptes inactifs
+// ---------------------------------------------------------------------------
+const ACCOUNT_RETENTION_MS = 730 * 24 * 60 * 60 * 1000; // 24 mois d'inactivité
+const INACTIVITY_PURGE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+async function deleteQueryDocuments(query) {
+  while (true) {
+    const snapshot = await query.limit(400).get();
+    if (snapshot.empty) break;
+    const batch = firebaseDb.batch();
+    snapshot.docs.forEach((document) => batch.delete(document.ref));
+    await batch.commit();
+    if (snapshot.size < 400) break;
+  }
+}
+
+async function deleteDocumentReferences(references) {
+  for (let offset = 0; offset < references.length; offset += 400) {
+    const batch = firebaseDb.batch();
+    references.slice(offset, offset + 400).forEach((reference) => batch.delete(reference));
+    await batch.commit();
+  }
+}
+
+async function deleteAccountData(uid) {
+  // Demandes d'amis et invitations, dans les deux sens.
+  await deleteQueryDocuments(firebaseDb.collection('friendRequests').where('fromUid', '==', uid));
+  await deleteQueryDocuments(firebaseDb.collection('friendRequests').where('toUid', '==', uid));
+  await deleteQueryDocuments(firebaseDb.collection('groupInvites').where('fromUid', '==', uid));
+  await deleteQueryDocuments(firebaseDb.collection('groupInvites').where('toUid', '==', uid));
+
+  // Amitiés et conversations privées associées.
+  const friendships = await firebaseDb.collection('friendships')
+    .where('users', 'array-contains', uid).get();
+
+  for (const friendship of friendships.docs) {
+    await firebaseDb.recursiveDelete(firebaseDb.collection('dms').doc(friendship.id));
+    await friendship.ref.delete();
+  }
+
+  // Nettoie aussi les anciennes conversations privées orphelines (amitié déjà retirée).
+  const dmReferences = await firebaseDb.collection('dms').listDocuments();
+  for (const reference of dmReferences) {
+    if (reference.id.startsWith(uid + '_') || reference.id.endsWith('_' + uid)) {
+      await firebaseDb.recursiveDelete(reference);
+    }
+  }
+
+  // Groupes : transfert du rôle de propriétaire si nécessaire, sinon suppression
+  // du membre. Un groupe sans autre membre et son chat sont supprimés.
+  const groups = await firebaseDb.collection('groups')
+    .where('members', 'array-contains', uid).get();
+
+  for (const groupDoc of groups.docs) {
+    const group = groupDoc.data() || {};
+    const remainingMembers = (group.members || []).filter((memberUid) => memberUid !== uid);
+
+    await deleteQueryDocuments(
+      firebaseDb.collection('groupInvites').where('groupId', '==', groupDoc.id)
+    );
+
+    if (remainingMembers.length === 0) {
+      await firebaseDb.recursiveDelete(firebaseDb.collection('groupChats').doc(groupDoc.id));
+      await groupDoc.ref.delete();
+      continue;
+    }
+
+    const updates = { members: remainingMembers };
+    updates['memberPseudos.' + uid] = FieldValue.delete();
+    updates['memberTeams.' + uid] = FieldValue.delete();
+
+    if (group.ownerId === uid) updates.ownerId = remainingMembers[0];
+    if (group.adminId === uid) updates.adminId = FieldValue.delete();
+
+    await groupDoc.ref.update(updates);
+  }
+
+  // Supprime tous les messages écrits par ce compte, y compris dans les chats
+  // de groupes qu'il a quittés auparavant.
+  const authoredMessages = await firebaseDb.collectionGroup('messages')
+    .where('fromUid', '==', uid).get();
+  await deleteDocumentReferences(authoredMessages.docs.map((document) => document.ref));
+
+  // Dernières données directement rattachées au compte.
+  await firebaseDb.collection('sanctions').doc(uid).delete().catch(() => {});
+  await firebaseDb.collection('users').doc(uid).delete();
+}
+
+async function purgeInactiveAccounts() {
+  const cutoff = Date.now() - ACCOUNT_RETENTION_MS;
+  let deleted = 0;
+
+  try {
+    const users = await firebaseDb.collection('users').get();
+    for (const userDoc of users.docs) {
+      const data = userDoc.data() || {};
+      const lastActivity = data.lastSeenAt?.toMillis?.() ?? data.createdAt?.toMillis?.() ?? null;
+      if (!lastActivity || lastActivity > cutoff) continue;
+
+      try {
+        await deleteAccountData(userDoc.id);
+        await firebaseAuth.deleteUser(userDoc.id).catch((error) => {
+          if (error.code !== 'auth/user-not-found') throw error;
+        });
+        deleted += 1;
+        console.info('[RGPD] Compte inactif supprimé : ' + userDoc.id);
+      } catch (error) {
+        console.error('[RGPD] Échec de suppression du compte inactif ' + userDoc.id + ':', error);
+      }
+    }
+    if (deleted) console.info('[RGPD] ' + deleted + ' compte(s) inactif(s) supprimé(s).');
+  } catch (error) {
+    console.error('[RGPD] Purge des comptes inactifs impossible :', error);
+  }
+}
+
+const httpServer = createServer(async (req, res) => {
+  const setCors = () => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  };
+  setCors();
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  const pathname = new URL(req.url || '/', 'http://localhost').pathname;
+
+  if (req.method === 'GET' && pathname === '/') {
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('BulletGrounds — serveur temps réel OK');
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/account/delete') {
+    const authorization = String(req.headers.authorization || '');
+    const tokenMatch = /^Bearer\s+(.+)$/i.exec(authorization);
+    if (!tokenMatch) {
+      res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: 'Authentification requise.' }));
+      return;
+    }
+
+    try {
+      // Vérifie aussi la révocation du jeton : un compte supprimé ne peut pas
+      // continuer à utiliser son ancien jeton pour rejoindre le serveur.
+      const decoded = await firebaseAuth.verifyIdToken(tokenMatch[1], true);
+      const authAgeMs = Date.now() - Number(decoded.auth_time || 0) * 1000;
+      if (!decoded.uid || authAgeMs < 0 || authAgeMs > 10 * 60 * 1000) {
+        res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'Reconnecte-toi avant de supprimer ton compte.' }));
+        return;
+      }
+
+      await deleteAccountData(decoded.uid);
+      await firebaseAuth.deleteUser(decoded.uid);
+
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      console.error('[RGPD] Suppression du compte impossible :', error);
+      const status = error.code === 'auth/id-token-revoked' ||
+        error.code === 'auth/id-token-expired' ||
+        error.code === 'auth/argument-error' ? 401 : 500;
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        error: status === 401
+          ? 'Session expirée. Reconnecte-toi puis réessaie.'
+          : 'La suppression a échoué. Aucune confirmation de suppression ne peut être donnée ; réessaie ou contacte le responsable du jeu.',
+      }));
+    }
+    return;
+  }
+
+  res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify({ error: 'Route introuvable.' }));
 });
 
 // Ouvert à tout le monde : le but est justement que n'importe qui avec le
@@ -761,8 +951,10 @@ io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth?.idToken;
     if (!token) return next(new Error('Authentification Firebase requise.'));
-    const decoded = await firebaseAuth.verifyIdToken(token);
+    const decoded = await firebaseAuth.verifyIdToken(token, true);
     const userDoc = await firebaseDb.collection('users').doc(decoded.uid).get();
+    if (!userDoc.exists) return next(new Error('Compte introuvable ou supprimé.'));
+    await userDoc.ref.update({ lastSeenAt: FieldValue.serverTimestamp() });
     socket.data.firebaseUid = decoded.uid;
     socket.data.isAdmin = String(userDoc.data()?.admin).toLowerCase() === 'true';
     // Un compte banni ou suspendu ne peut pas rejoindre la partie, même avec un
@@ -780,6 +972,162 @@ io.use(async (socket, next) => {
 // socket.id -> { pseudo, position, rotationY, hp, shield, weapons, vestCount,
 //                maxVestSlots, money, alive }
 const players = new Map();
+
+// ---------------------------------------------------------------------------
+// Parties de groupe : lancement, réglages (éliminatoire, régénération)
+// ---------------------------------------------------------------------------
+// groups/{groupId}.match    = { status: 'running' | 'idle' }  — lancé par le créateur / l'admin du groupe
+// groups/{groupId}.settings = { elimination, regen }           — réglés par eux aussi
+// Le serveur lit ces champs lui-même dans Firestore (jamais ce que dit le client)
+// et les suit en direct tant qu'au moins un joueur du groupe est connecté.
+// Les joueurs sans groupe ne sont pas concernés : ils jouent comme avant.
+const REGEN_DELAY_MS = 5000; // sans dégâts avant que la vie remonte
+const REGEN_PER_SECOND = 10;
+const REGEN_TICK_MS = 500;
+const MATCH_OVER_DELAY_MS = 8000; // affichage du vainqueur avant le retour au lobby
+const TEAM_WINNER_LABELS = { red: "l'équipe rouge", blue: "l'équipe bleue", yellow: "l'équipe jaune", green: "l'équipe verte" };
+const groupStates = new Map(); // groupId -> { data, unsubscribe, over, eliminatedUids }
+
+function groupSettingsOf(groupId) {
+  const settings = (groupId && groupStates.get(groupId)?.data?.settings) || {};
+  return { elimination: settings.elimination === true, regen: settings.regen === true };
+}
+
+function groupSocketIds(groupId) {
+  return Array.from(players.entries()).filter(([, p]) => p.groupId === groupId).map(([id]) => id);
+}
+
+function watchGroup(groupId, data) {
+  const existing = groupStates.get(groupId);
+  if (existing) {
+    existing.data = data;
+    return existing;
+  }
+  const state = { data, unsubscribe: null, over: false, eliminatedUids: new Set() };
+  groupStates.set(groupId, state);
+  state.unsubscribe = firebaseDb.collection('groups').doc(groupId).onSnapshot(
+    (snap) => handleGroupSnapshot(groupId, snap),
+    (error) => console.error(`[groupe ${groupId}] suivi Firestore impossible :`, error.message)
+  );
+  return state;
+}
+
+function releaseGroupIfEmpty(groupId) {
+  if (!groupId || groupSocketIds(groupId).length > 0) return;
+  const state = groupStates.get(groupId);
+  if (!state) return;
+  state.unsubscribe?.();
+  groupStates.delete(groupId);
+}
+
+// Vérifie côté serveur qu'un joueur peut entrer : groupe existant, membre, partie lancée,
+// pas éliminé. Renvoie { ok, data } ou { ok: false, reason }.
+async function authorizeGroupJoin(groupId, uid) {
+  let snap;
+  try {
+    snap = await firebaseDb.collection('groups').doc(groupId).get();
+  } catch (error) {
+    console.error(`[groupe ${groupId}] lecture impossible :`, error.message);
+    return { ok: false, reason: 'Impossible de vérifier ton groupe pour le moment. Réessaie dans un instant.' };
+  }
+  if (!snap.exists) return { ok: false, reason: "Ce groupe n'existe plus." };
+  const data = snap.data();
+  if (!uid || !Array.isArray(data.members) || !data.members.includes(uid)) {
+    return { ok: false, reason: 'Tu ne fais pas partie de ce groupe.' };
+  }
+  if (data.match?.status !== 'running') {
+    return { ok: false, reason: "La partie n'est pas lancée : le créateur ou un admin du groupe doit la lancer." };
+  }
+  const state = watchGroup(groupId, data);
+  if (state.over) return { ok: false, reason: 'La partie vient de se terminer.' };
+  if (groupSettingsOf(groupId).elimination && state.eliminatedUids.has(uid)) {
+    return { ok: false, reason: "Tu as été éliminé : attends la prochaine partie." };
+  }
+  return { ok: true, data };
+}
+
+function kickFromMatch(socketId, reason) {
+  io.to(socketId).emit('match-ended', { reason });
+  const timer = setTimeout(() => io.sockets.sockets.get(socketId)?.disconnect(true), 1500);
+  timer.unref?.();
+}
+
+function endGroupMatch(groupId, reason) {
+  groupSocketIds(groupId).forEach((id) => kickFromMatch(id, reason));
+}
+
+function handleGroupSnapshot(groupId, snap) {
+  const state = groupStates.get(groupId);
+  if (!state) return;
+  const previous = state.data;
+  const data = snap.exists ? snap.data() : null;
+  state.data = data;
+  if (!data) {
+    endGroupMatch(groupId, 'deleted');
+    return;
+  }
+  if (data.match?.status !== 'running') {
+    // Arrêtée par un admin du groupe, ou terminée (éliminatoire) : tout le monde retourne au lobby
+    if (previous?.match?.status === 'running') endGroupMatch(groupId, state.over ? 'finished' : 'stopped');
+    return;
+  }
+  if (previous && previous.match?.status !== 'running') {
+    state.over = false; // nouvelle partie
+    state.eliminatedUids.clear();
+  }
+  // Membre retiré du groupe en pleine partie
+  const members = Array.isArray(data.members) ? data.members : [];
+  players.forEach((p, id) => {
+    if (p.groupId === groupId && !members.includes(p.uid)) kickFromMatch(id, 'removed');
+  });
+  // Éliminatoire coupé en cours de route : les éliminés reviennent
+  if (previous?.settings?.elimination && !data.settings?.elimination) {
+    state.eliminatedUids.clear();
+    players.forEach((p, id) => {
+      if (p.groupId === groupId && p.eliminated) respawnPlayer(id);
+    });
+  }
+}
+
+// Mode éliminatoire : la partie se termine quand il ne reste qu'un joueur (ou une équipe)
+// en vie. Il faut au moins 2 joueurs du groupe connectés, sinon un test en solo se
+// terminerait tout de suite.
+function checkGroupElimination(groupId) {
+  if (!groupId) return;
+  const state = groupStates.get(groupId);
+  if (!state || state.over || state.data?.match?.status !== 'running') return;
+  if (!groupSettingsOf(groupId).elimination) return;
+  const members = Array.from(players.values()).filter((p) => p.groupId === groupId);
+  if (members.length < 2) return;
+  const teamMode = state.data.mode === 'team';
+  const sideOf = (p) => (teamMode ? p.team : p.uid);
+  const alive = members.filter((p) => !p.eliminated);
+  if (new Set(alive.map(sideOf)).size > 1) return;
+
+  state.over = true;
+  const survivor = alive[0] || null;
+  const winner = survivor ? (teamMode ? TEAM_WINNER_LABELS[survivor.team] || survivor.team : survivor.pseudo) : null;
+  groupSocketIds(groupId).forEach((id) => io.to(id).emit('match-over', { winner }));
+  const timer = setTimeout(() => {
+    firebaseDb.collection('groups').doc(groupId).update({ 'match.status': 'idle' }).catch((error) => {
+      console.error(`[groupe ${groupId}] fin de partie impossible à enregistrer :`, error.message);
+    });
+  }, MATCH_OVER_DELAY_MS);
+  timer.unref?.();
+}
+
+// Régénération : après REGEN_DELAY_MS sans dégâts, la vie remonte (groupes qui l'ont activée)
+const regenTimer = setInterval(() => {
+  const now = Date.now();
+  players.forEach((p, id) => {
+    if (!p.alive || p.godmode || p.hp >= MAX_HP) return;
+    if (!groupSettingsOf(p.groupId).regen) return;
+    if (now - (p.lastDamageAt || 0) < REGEN_DELAY_MS) return;
+    p.hp = Math.min(MAX_HP, Math.round(p.hp + (REGEN_PER_SECOND * REGEN_TICK_MS) / 1000));
+    io.to(id).emit('your-hp', { hp: p.hp });
+  });
+}, REGEN_TICK_MS);
+regenTimer.unref?.();
 
 // ---------------------------------------------------------------------------
 // Stuff au sol — armes et gilets qui tombent à la mort d'un joueur (voir
@@ -1154,6 +1502,7 @@ function dealDamage(attackerId, targetId, amount, { headshot = false, weapon = n
   if (attacker?.oneShot && attackerId !== targetId) amount = target.hp + target.shield + 1;
   const total = Math.round(amount);
   if (total <= 0) return;
+  target.lastDamageAt = Date.now(); // la régénération repart 5 s après
 
   let damage = total;
   if (target.shield > 0) {
@@ -1294,7 +1643,10 @@ function killPlayer(victimId, killerId, weapon = null) {
   }
 
   io.emit('player-died', { id: victimId, killedBy: killerId || null });
-  io.to(victimId).emit('you-died');
+  const eliminated = groupSettingsOf(victim.groupId).elimination;
+  victim.eliminated = eliminated;
+  if (eliminated) groupStates.get(victim.groupId)?.eliminatedUids.add(victim.uid);
+  io.to(victimId).emit('you-died', { eliminated });
 
   // Kill feed : tout est résolu ici (pseudos, équipes, arme) pour que les
   // clients n'aient rien à deviner — et n'affichent jamais un id inconnu si
@@ -1315,7 +1667,12 @@ function killPlayer(victimId, killerId, weapon = null) {
   broadcastAdminPlayers();
 
   clearTimeout(victim.respawnTimer);
-  victim.respawnTimer = setTimeout(() => respawnPlayer(victimId), RESPAWN_DELAY_MS);
+  if (eliminated) {
+    victim.respawnTimer = null; // éliminé : pas de réapparition avant la fin de la partie
+    checkGroupElimination(victim.groupId);
+  } else {
+    victim.respawnTimer = setTimeout(() => respawnPlayer(victimId), RESPAWN_DELAY_MS);
+  }
 }
 
 // Ramène un joueur mort à la vie à son point de départ (après RESPAWN_DELAY_MS,
@@ -1324,6 +1681,7 @@ function respawnPlayer(victimId) {
   const victim = players.get(victimId);
   if (!victim || victim.alive) return; // parti entre-temps, ou déjà ressuscité
   clearTimeout(victim.respawnTimer);
+  victim.eliminated = false;
   const { position: spawn, spawnIndex } = pickTeamSpawn(victim.team, victim.groupId);
   victim.alive = true;
   victim.hp = MAX_HP;
@@ -1374,7 +1732,7 @@ function broadcastAdminPlayers() {
 }
 
 io.on('connection', (socket) => {
-  socket.on('join', (payload) => {
+  async function handleJoin(payload) {
     // Compat : un vieux client pourrait encore envoyer juste le pseudo en
     // texte brut plutôt que { pseudo, appearance }.
     const {
@@ -1387,12 +1745,33 @@ io.on('connection', (socket) => {
     const pseudo = String(pseudoInput || 'Joueur').slice(0, 20);
     const appearance = sanitizeAppearance(appearanceInput);
     const groupId = sanitizeGroupId(groupIdInput);
+    if (players.has(socket.id)) return; // déjà dans la partie
+
+    // Dans un groupe : le serveur vérifie lui-même (Firestore) l'appartenance, le lancement
+    // de la partie et l'éventuelle élimination — jamais ce que le client annonce.
+    let groupData = null;
+    if (groupId) {
+      const access = await authorizeGroupJoin(groupId, socket.data.firebaseUid);
+      if (socket.disconnected || players.has(socket.id)) {
+        releaseGroupIfEmpty(groupId);
+        return;
+      }
+      if (!access.ok) {
+        socket.emit('join-denied', { reason: access.reason });
+        releaseGroupIfEmpty(groupId);
+        return;
+      }
+      groupData = access.data;
+    }
 
     // Mode "Équipes" avec une couleur choisie par l'admin du groupe : on la
     // prend telle quelle plutôt que d'auto-équilibrer. Sinon (mode "Solo", ou
     // pas encore assigné par l'admin), comportement inchangé.
-    const teamChoice = sanitizeTeamChoice(teamChoiceInput);
-    const mode = sanitizeMode(modeInput, teamChoice);
+    // Avec un groupe, mode et équipe viennent de Firestore (pas du client).
+    const teamChoice = groupData
+      ? (groupData.mode === 'team' ? sanitizeTeamChoice(groupData.memberTeams?.[socket.data.firebaseUid]) : null)
+      : sanitizeTeamChoice(teamChoiceInput);
+    const mode = sanitizeMode(groupData ? groupData.mode : modeInput, teamChoice);
     const team = mode === 'team' ? teamChoice : assignTeam();
     const { position: spawn, spawnIndex } = pickTeamSpawn(team, groupId);
 
@@ -1472,6 +1851,8 @@ io.on('connection', (socket) => {
       frozen: false,
       speedMultiplier: 1,
       respawnTimer: null,
+      eliminated: false,
+      lastDamageAt: 0,
     };
     players.set(socket.id, player);
     socket.emit('your-weapons', { weapons: player.weapons });
@@ -1488,6 +1869,9 @@ io.on('connection', (socket) => {
     console.log(
       `[+] ${pseudo} (${socket.id}) — équipe ${team}${mode === 'team' ? ' (mode équipes)' : ''} — ${players.size} joueur(s) connecté(s)`
     );
+  }
+  socket.on('join', (payload) => {
+    handleJoin(payload).catch((error) => console.error('[join] erreur :', error));
   });
 
   adminTools.registerSocket(socket);
@@ -1779,6 +2163,8 @@ io.on('connection', (socket) => {
     emitToIds(allyIds(socket.id), 'ping-removed', { senderId: socket.id });
     players.delete(socket.id);
     io.emit('player-left', { id: socket.id });
+    checkGroupElimination(player.groupId); // un départ peut laisser un seul survivant
+    releaseGroupIfEmpty(player.groupId);
     broadcastScoreboard();
     broadcastAdminPlayers();
     console.log(`[-] ${player.pseudo} (${socket.id}) — ${players.size} joueur(s) connecté(s)`);
@@ -1786,5 +2172,9 @@ io.on('connection', (socket) => {
 });
 
 httpServer.listen(PORT, () => {
-  console.log(`Serveur Mini Warzone (Socket.io) lancé sur http://localhost:${PORT}`);
+  console.log(`Serveur BulletGrounds (Socket.io) lancé sur http://localhost:${PORT}`);
+  // Première vérification au démarrage, puis une fois par jour.
+  void purgeInactiveAccounts();
+  const purgeTimer = setInterval(purgeInactiveAccounts, INACTIVITY_PURGE_INTERVAL_MS);
+  purgeTimer.unref?.();
 });
