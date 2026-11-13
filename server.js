@@ -992,9 +992,21 @@ const MATCH_OVER_DELAY_MS = 8000; // affichage du vainqueur avant le retour au l
 const TEAM_WINNER_LABELS = { red: "l'équipe rouge", blue: "l'équipe bleue", yellow: "l'équipe jaune", green: "l'équipe verte" };
 const groupStates = new Map(); // groupId -> { data, unsubscribe, over, eliminatedUids }
 
+function clampNumber(value, min, max, fallback) {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+}
+
+// Réglages d'un groupe, relus tels quels dans Firestore puis bornés ici : un client ne peut pas
+// imposer une valeur absurde (vitesse de zone, dégâts...).
 function groupSettingsOf(groupId) {
   const settings = (groupId && groupStates.get(groupId)?.data?.settings) || {};
-  return { elimination: settings.elimination === true, regen: settings.regen === true };
+  return {
+    elimination: settings.elimination === true,
+    regen: settings.regen === true,
+    zone: settings.zone === true,
+    zoneSpeed: clampNumber(settings.zoneSpeed, 0.1, 10, 1), // m/s dont le rayon diminue
+    zoneDamage: Math.round(clampNumber(settings.zoneDamage, 0, 100, 5)), // PV perdus par seconde hors zone
+  };
 }
 
 function groupSocketIds(groupId) {
@@ -1132,6 +1144,100 @@ const regenTimer = setInterval(() => {
   });
 }, REGEN_TICK_MS);
 regenTimer.unref?.();
+
+// ---------------------------------------------------------------------------
+// Zone qui rétrécit (réglage « zone » du groupe)
+// ---------------------------------------------------------------------------
+// Un cercle centré sur la map, qui couvre toute la map au départ, attend ZONE_START_DELAY_MS
+// puis se resserre de `zoneSpeed` m/s jusqu'à ZONE_MIN_RADIUS. Chaque seconde, les joueurs
+// vivants du groupe hors du cercle perdent `zoneDamage` PV. Seuls les joueurs du groupe
+// sont concernés ; la zone repart de zéro à chaque nouvelle partie.
+const ZONE_START_DELAY_MS = Number(process.env.ZONE_START_DELAY_MS) || 30000;
+const ZONE_MIN_RADIUS = 6;
+const ZONE_TICK_MS = 250;
+const ZONE_DAMAGE_EVERY_MS = 1000;
+const ZONE_BROADCAST_EVERY_MS = 500;
+
+// Centre et rayon de départ déduits des obstacles de la map (le rayon va jusqu'aux coins)
+function computeZoneGeometry() {
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const box of OBSTACLES) {
+    if (![box.minX, box.maxX, box.minZ, box.maxZ].every(Number.isFinite)) continue;
+    minX = Math.min(minX, box.minX);
+    maxX = Math.max(maxX, box.maxX);
+    minZ = Math.min(minZ, box.minZ);
+    maxZ = Math.max(maxZ, box.maxZ);
+  }
+  if (!Number.isFinite(minX)) return { cx: 0, cz: 0, radius: 110 };
+  return { cx: (minX + maxX) / 2, cz: (minZ + maxZ) / 2, radius: Math.hypot(maxX - minX, maxZ - minZ) / 2 };
+}
+const ZONE_GEOMETRY = computeZoneGeometry();
+console.info(
+  `[ZONE] centre (${ZONE_GEOMETRY.cx.toFixed(1)}, ${ZONE_GEOMETRY.cz.toFixed(1)}), rayon de départ ${ZONE_GEOMETRY.radius.toFixed(1)} m.`
+);
+
+function zonePayload(state, settings, now) {
+  const zone = state.zone;
+  const shrinking = now - zone.startedAt >= ZONE_START_DELAY_MS && zone.radius > ZONE_MIN_RADIUS;
+  return {
+    enabled: true,
+    cx: ZONE_GEOMETRY.cx,
+    cz: ZONE_GEOMETRY.cz,
+    radius: zone.radius,
+    minRadius: ZONE_MIN_RADIUS,
+    speed: shrinking ? settings.zoneSpeed : 0, // le client prolonge le rétrécissement entre deux messages
+    startsInMs: Math.max(0, ZONE_START_DELAY_MS - (now - zone.startedAt)),
+    damage: settings.zoneDamage,
+  };
+}
+
+// Un joueur qui arrive en cours de partie reçoit tout de suite l'état de la zone
+function sendZoneState(socketId, groupId) {
+  const state = groupId ? groupStates.get(groupId) : null;
+  if (!state?.zone) return;
+  io.to(socketId).emit('zone-update', zonePayload(state, groupSettingsOf(groupId), Date.now()));
+}
+
+const zoneTimer = setInterval(() => {
+  const now = Date.now();
+  groupStates.forEach((state, groupId) => {
+    const settings = groupSettingsOf(groupId);
+    const running = state.data?.match?.status === 'running' && !state.over;
+    if (!settings.zone || !running) {
+      if (state.zone) {
+        state.zone = null; // zone coupée ou partie finie : les clients la font disparaître
+        groupSocketIds(groupId).forEach((id) => io.to(id).emit('zone-update', { enabled: false }));
+      }
+      return;
+    }
+    if (!state.zone) {
+      state.zone = { radius: ZONE_GEOMETRY.radius, startedAt: now, lastTickAt: now, lastDamageAt: now, lastBroadcastAt: 0 };
+    }
+    const zone = state.zone;
+    const dt = (now - zone.lastTickAt) / 1000;
+    zone.lastTickAt = now;
+    if (now - zone.startedAt >= ZONE_START_DELAY_MS) {
+      zone.radius = Math.max(ZONE_MIN_RADIUS, zone.radius - settings.zoneSpeed * dt);
+    }
+    if (now - zone.lastDamageAt >= ZONE_DAMAGE_EVERY_MS) {
+      zone.lastDamageAt = now;
+      if (settings.zoneDamage > 0) {
+        players.forEach((p, id) => {
+          if (p.groupId !== groupId || !p.alive || p.eliminated) return;
+          const distance = Math.hypot(p.position.x - ZONE_GEOMETRY.cx, p.position.z - ZONE_GEOMETRY.cz);
+          // `source` : le centre de la zone, pour l'indicateur de direction des dégâts
+          if (distance > zone.radius) dealDamage(null, id, settings.zoneDamage, { source: { x: ZONE_GEOMETRY.cx, z: ZONE_GEOMETRY.cz } });
+        });
+      }
+    }
+    if (now - zone.lastBroadcastAt >= ZONE_BROADCAST_EVERY_MS) {
+      zone.lastBroadcastAt = now;
+      const payload = zonePayload(state, settings, now);
+      groupSocketIds(groupId).forEach((id) => io.to(id).emit('zone-update', payload));
+    }
+  });
+}, ZONE_TICK_MS);
+zoneTimer.unref?.();
 
 // ---------------------------------------------------------------------------
 // Stuff au sol — armes et gilets qui tombent à la mort d'un joueur (voir
@@ -1859,6 +1965,7 @@ io.on('connection', (socket) => {
       lastDamageAt: 0,
     };
     players.set(socket.id, player);
+    sendZoneState(socket.id, groupId);
     socket.emit('your-weapons', { weapons: player.weapons });
     socket.emit('your-grenades', { ...player.grenades });
     socket.emit('your-vest-count', { count: 0 });
