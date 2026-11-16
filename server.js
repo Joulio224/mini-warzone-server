@@ -13,6 +13,8 @@ import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { readFileSync, existsSync } from 'node:fs';
 import { createAdminTools } from './admin-tools.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { createCollisionWorld } from './collision-world.js';
 import { randomUUID } from 'node:crypto';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -195,6 +197,8 @@ const GRENADE_THROW_COOLDOWN_MS = 700;
 
 function grenadeCollides(boxes, x, y, z) {
   const r = GRENADE_RADIUS;
+  // Collisions précises (voir COLLISION_WORLD plus bas) : `boxes` est alors le monde lui-même.
+  if (typeof boxes.collidesSphere === 'function') return boxes.collidesSphere(x, y, z, r);
   for (let i = 0; i < boxes.length; i++) {
     const b = boxes[i];
     if (
@@ -633,6 +637,43 @@ try {
   }
 }
 
+// Collisions PRÉCISES : les triangles réels de map-colliders.glb dans un BVH
+// (three-mesh-bvh, voir collision-world.js — même fichier que côté client).
+// Tirs, grenades et hauteur du sol des objets lâchés l'utilisent : une balle ou
+// une grenade passe par les portes des bâtiments au lieu de buter sur leur boîte
+// englobante. Si le chargement échoue, on retombe sur les boîtes (OBSTACLES).
+async function loadCollisionWorld() {
+  const candidates = [
+    './map-colliders.glb',
+    './public/assets/map-colliders.glb',
+    '../BulletGrounds/public/assets/map-colliders.glb',
+    '../mini-warzone/public/assets/map-colliders.glb',
+  ].map((relative) => new URL(relative, import.meta.url));
+  const path = candidates.find((url) => existsSync(url));
+  if (!path) throw new Error('map-colliders.glb introuvable.');
+  const file = readFileSync(path);
+  const arrayBuffer = file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength);
+  const gltf = await new Promise((resolve, reject) => {
+    new GLTFLoader().parse(arrayBuffer, '', resolve, reject);
+  });
+  return createCollisionWorld(gltf.scene);
+}
+
+let COLLISION_WORLD = null;
+try {
+  COLLISION_WORLD = await loadCollisionWorld();
+  console.info(
+    `[MAP-COLLIDERS] Serveur : collisions précises prêtes (${COLLISION_WORLD.triangleCount} triangle(s), BVH).`
+  );
+} catch (error) {
+  console.error(
+    '[MAP-COLLIDERS] Collisions précises indisponibles, repli sur les boîtes englobantes :',
+    error.message
+  );
+}
+// Ce que la physique des grenades teste : le monde précis, sinon les boîtes.
+const GRENADE_WORLD = COLLISION_WORLD || OBSTACLES;
+
 // Distance d'intersection rayon/boîte (test des "tranches" standard). Rend
 // null si le rayon ne touche pas la boîte, sinon la distance du premier point
 // de contact.
@@ -662,6 +703,9 @@ function rayBoxDistance(ox, oy, oz, dx, dy, dz, box) {
 // sert à la fois à limiter la portée visuelle du traceur ET à empêcher un tir
 // de toucher quelqu'un caché derrière un mur/une caisse.
 function nearestObstacleDistance(origin, direction) {
+  if (COLLISION_WORLD) {
+    return COLLISION_WORLD.rayDistance(origin.x, origin.y, origin.z, direction.x, direction.y, direction.z);
+  }
   let nearest = Infinity;
   for (const box of OBSTACLES) {
     const dist = rayBoxDistance(origin.x, origin.y, origin.z, direction.x, direction.y, direction.z, box);
@@ -1270,6 +1314,8 @@ const LOOT_GRAVITY = 12; // m/s², pour la durée de chute (le client anime la m
 // Hauteur du sol sous (x, z), en partant de `fromY` : le dessus de la boîte de
 // collision la plus haute située sous ce point (sol, caisse, plateforme), 0 par défaut.
 function groundHeightAt(x, fromY, z) {
+  // Surface portante la plus proche sous le point (même marge de 0,2 m qu'avant).
+  if (COLLISION_WORLD) return COLLISION_WORLD.groundHeightAt(x, fromY + 0.2, z, 0);
   let best = 0;
   for (let i = 0; i < OBSTACLES.length; i++) {
     const b = OBSTACLES[i];
@@ -1654,7 +1700,7 @@ function tickGrenades() {
   lastGrenadeTick = now;
 
   for (const g of Array.from(grenades.values())) {
-    for (let i = 0; i < steps; i++) stepGrenade(g, OBSTACLES, GRENADE_STEP);
+    for (let i = 0; i < steps; i++) stepGrenade(g, GRENADE_WORLD, GRENADE_STEP);
     if (now >= g.explodeAt) explodeGrenade(g);
   }
   if (grenades.size === 0) {
@@ -2162,7 +2208,7 @@ io.on('connection', (socket) => {
       y: player.position.y - 0.1 + dir.y * 0.6,
       z: player.position.z + dir.z * 0.6,
     };
-    if (grenadeCollides(OBSTACLES, pos.x, pos.y, pos.z)) {
+    if (grenadeCollides(GRENADE_WORLD, pos.x, pos.y, pos.z)) {
       pos = { x: player.position.x, y: player.position.y - 0.1, z: player.position.z };
     }
     const vel = {
