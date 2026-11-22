@@ -307,17 +307,47 @@ function tryPurchase(socket, player, itemId) {
 
 const TEAMS = ['red', 'blue', 'yellow', 'green'];
 
-// Doit rester identique à EMOJI_FACES dans src/appearance.js — le serveur ne
-// fait confiance à aucune valeur envoyée par le client : couleur hors format
-// ou emoji hors liste retombent silencieusement sur une valeur par défaut.
+// Doit rester identique aux listes de src/appearance.js (client) — le serveur ne
+// fait confiance à aucune valeur envoyée par le client : couleur hors format ou
+// choix hors liste retombent silencieusement sur une valeur par défaut.
+//
+// Apparence = soldat 3D : couleur du haut / du bas, teint, coiffure, couleur des
+// cheveux, couvre-chef et sa couleur. `bodyColor` (= couleur du haut) et `face`
+// (emoji, plus affiché) restent envoyés pour la compatibilité : le ping d'équipe
+// et la minimap lisent bodyColor, et les anciens clients lisent face.
 const EMOJI_FACES = ['😀', '😎', '😡', '😱', '🤖', '👽', '💀', '🥶', '🤠', '🤡', '😈', '🥵'];
-const DEFAULT_APPEARANCE = { bodyColor: '#8a8f98', face: EMOJI_FACES[0] };
+const HAIR_STYLE_IDS = ['court', 'rase', 'long', 'crete', 'chauve'];
+const HEADGEAR_IDS = ['none', 'casquette', 'bonnet', 'casque'];
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+const DEFAULT_APPEARANCE = {
+  bodyColor: '#4b5d3a',
+  face: EMOJI_FACES[0],
+  topColor: '#4b5d3a',
+  bottomColor: '#3b3f46',
+  skin: '#e0ac82',
+  hair: 'court',
+  hairColor: '#3a2a1e',
+  headgear: 'none',
+  headgearColor: '#4b5320',
+};
+
+function pickHex(...values) {
+  return values.find((v) => typeof v === 'string' && HEX_COLOR_RE.test(v));
+}
 
 function sanitizeAppearance(input) {
-  const bodyColor = HEX_COLOR_RE.test(input?.bodyColor) ? input.bodyColor : DEFAULT_APPEARANCE.bodyColor;
-  const face = EMOJI_FACES.includes(input?.face) ? input.face : DEFAULT_APPEARANCE.face;
-  return { bodyColor, face };
+  const topColor = pickHex(input?.topColor, input?.bodyColor) ?? DEFAULT_APPEARANCE.topColor;
+  return {
+    bodyColor: topColor,
+    face: EMOJI_FACES[0],
+    topColor,
+    bottomColor: pickHex(input?.bottomColor) ?? DEFAULT_APPEARANCE.bottomColor,
+    skin: pickHex(input?.skin) ?? DEFAULT_APPEARANCE.skin,
+    hair: HAIR_STYLE_IDS.includes(input?.hair) ? input.hair : DEFAULT_APPEARANCE.hair,
+    hairColor: pickHex(input?.hairColor) ?? DEFAULT_APPEARANCE.hairColor,
+    headgear: HEADGEAR_IDS.includes(input?.headgear) ? input.headgear : DEFAULT_APPEARANCE.headgear,
+    headgearColor: pickHex(input?.headgearColor) ?? DEFAULT_APPEARANCE.headgearColor,
+  };
 }
 
 // Identifiant du groupe Firestore (voir src/groups.js côté client) auquel le
