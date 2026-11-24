@@ -15,6 +15,8 @@ import { readFileSync, existsSync } from 'node:fs';
 import { createAdminTools } from './admin-tools.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createCollisionWorld } from './collision-world.js';
+import { createBotManager } from './bots.js';
+import { createEmailVerification, HttpError } from './email-verification.js';
 import { randomUUID } from 'node:crypto';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -41,6 +43,12 @@ catch { throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON doit contenir un JSON val
 const firebaseAdminApp = getApps()[0] || initializeApp({ credential: cert(serviceAccount) });
 const firebaseAuth = getAuth(firebaseAdminApp);
 const firebaseDb = getFirestore(firebaseAdminApp);
+// Vérification des nouveaux comptes par code envoyé par mail (voir email-verification.js)
+const emailVerification = createEmailVerification({
+  firebaseAuth,
+  firebaseDb,
+  fallbackSecret: serviceAccount.private_key,
+});
 
 const PORT = process.env.PORT || 3001;
 
@@ -985,6 +993,56 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
 
+  // --- Vérification du compte par code (voir email-verification.js) ------------------------
+  if (pathname.startsWith('/auth/')) {
+    const sendJson = (status, body) => {
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(body));
+    };
+    try {
+      const tokenMatch = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ''));
+      if (!tokenMatch) throw new HttpError(401, 'Authentification requise.');
+      let decoded;
+      try {
+        decoded = await firebaseAuth.verifyIdToken(tokenMatch[1], true);
+      } catch {
+        throw new HttpError(401, 'Session expirée. Reconnecte-toi puis réessaie.');
+      }
+
+      if (req.method === 'GET' && pathname === '/auth/status') {
+        sendJson(200, { verified: await emailVerification.isVerified(decoded.uid) });
+      } else if (req.method === 'POST' && pathname === '/auth/send-code') {
+        await emailVerification.sendCode(decoded.uid, decoded.email); // adresse du jeton, jamais celle du client
+        sendJson(200, { success: true });
+      } else if (req.method === 'POST' && pathname === '/auth/verify-code') {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk;
+          if (body.length > 1024) throw new HttpError(413, 'Requête trop grande.');
+        }
+        let parsed = {};
+        try { parsed = JSON.parse(body || '{}'); } catch { throw new HttpError(400, 'Requête invalide.'); }
+        await emailVerification.verifyCode(decoded.uid, parsed.code);
+        sendJson(200, { success: true });
+      } else if (req.method === 'POST' && pathname === '/auth/cancel-signup') {
+        // Erreur de frappe dans l'e-mail : un compte NON vérifié peut être supprimé pour recommencer
+        if (await emailVerification.isVerified(decoded.uid)) throw new HttpError(403, 'Ce compte est vérifié : utilise la suppression de compte.');
+        await deleteAccountData(decoded.uid);
+        await firebaseDb.collection('emailVerifications').doc(decoded.uid).delete().catch(() => {});
+        await firebaseAuth.deleteUser(decoded.uid);
+        sendJson(200, { success: true });
+      } else {
+        throw new HttpError(404, 'Route introuvable.');
+      }
+    } catch (error) {
+      if (!(error instanceof HttpError)) console.error('[VERIF] Erreur :', error);
+      sendJson(error instanceof HttpError ? error.status : 500, {
+        error: error instanceof HttpError ? error.message : 'Erreur du serveur. Réessaie dans un moment.',
+      });
+    }
+    return;
+  }
+
   res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify({ error: 'Route introuvable.' }));
 });
@@ -1026,6 +1084,9 @@ io.use(async (socket, next) => {
     const token = socket.handshake.auth?.idToken;
     if (!token) return next(new Error('Authentification Firebase requise.'));
     const decoded = await firebaseAuth.verifyIdToken(token, true);
+    // Compte créé après la mise en place du code par mail : il doit l'avoir saisi (jamais
+    // seulement côté client : un client modifié ne doit pas pouvoir sauter l'écran de vérification).
+    if (!(await emailVerification.isVerified(decoded.uid))) return next(new Error('Compte non vérifié : saisis le code reçu par mail.'));
     const userDoc = await firebaseDb.collection('users').doc(decoded.uid).get();
     if (!userDoc.exists) return next(new Error('Compte introuvable ou supprimé.'));
     await userDoc.ref.update({ lastSeenAt: FieldValue.serverTimestamp() });
@@ -1084,7 +1145,8 @@ function groupSettingsOf(groupId) {
 }
 
 function groupSocketIds(groupId) {
-  return Array.from(players.entries()).filter(([, p]) => p.groupId === groupId).map(([id]) => id);
+  // Les bots n'ont pas de socket : on ne les compte pas (ni pour les messages, ni pour savoir si le groupe est vide)
+  return Array.from(players.entries()).filter(([, p]) => p.groupId === groupId && !p.isBot).map(([id]) => id);
 }
 
 function watchGroup(groupId, data) {
@@ -1104,6 +1166,7 @@ function watchGroup(groupId, data) {
 
 function releaseGroupIfEmpty(groupId) {
   if (!groupId || groupSocketIds(groupId).length > 0) return;
+  botManager.removeGroupBots(groupId); // plus aucun humain : les bots partent avec eux
   const state = groupStates.get(groupId);
   if (!state) return;
   state.unsubscribe?.();
@@ -1159,6 +1222,7 @@ function handleGroupSnapshot(groupId, snap) {
   if (data.match?.status !== 'running') {
     // Arrêtée par un admin du groupe, ou terminée (éliminatoire) : tout le monde retourne au lobby
     if (previous?.match?.status === 'running') endGroupMatch(groupId, state.over ? 'finished' : 'stopped');
+    botManager.removeGroupBots(groupId);
     return;
   }
   if (previous && previous.match?.status !== 'running') {
@@ -1168,7 +1232,7 @@ function handleGroupSnapshot(groupId, snap) {
   // Membre retiré du groupe en pleine partie
   const members = Array.isArray(data.members) ? data.members : [];
   players.forEach((p, id) => {
-    if (p.groupId === groupId && !members.includes(p.uid)) kickFromMatch(id, 'removed');
+    if (p.groupId === groupId && !p.isBot && !members.includes(p.uid)) kickFromMatch(id, 'removed');
   });
   // Éliminatoire coupé en cours de route : les éliminés reviennent
   if (previous?.settings?.elimination && !data.settings?.elimination) {
@@ -1177,6 +1241,8 @@ function handleGroupSnapshot(groupId, snap) {
       if (p.groupId === groupId && p.eliminated) respawnPlayer(id);
     });
   }
+  // Bots ajoutés / retirés / changés de niveau ou d'équipe pendant la partie
+  botManager.syncGroup(groupId);
 }
 
 // Mode éliminatoire : la partie se termine quand il ne reste qu'un joueur (ou une équipe)
@@ -1883,6 +1949,7 @@ function respawnPlayer(victimId) {
   io.to(victimId).emit('your-weapons', { weapons: victim.weapons });
   io.to(victimId).emit('your-vest-count', { count: victim.vestCount });
   if (!victim.invisible) io.emit('player-respawned', { id: victimId, position: spawn });
+  botManager.onRespawn(victim); // un bot se rééquipe selon son niveau
   broadcastAdminPlayers();
 }
 
@@ -1916,6 +1983,20 @@ const adminTools = createAdminTools({
 function broadcastAdminPlayers() {
   adminTools.broadcastPlayers();
 }
+
+// Bots de groupe (voir bots.js) : pilotés par le serveur, ajoutés depuis le lobby.
+const botManager = createBotManager({
+  io, players, groupStates,
+  getCollisionWorld: () => COLLISION_WORLD,
+  getZoneGeometry: () => ZONE_GEOMETRY,
+  MAX_HP, HEADSHOT_MULTIPLIER, SHIELD_PER_VEST,
+  makeWeapon, weaponDef, weaponDamage, falloffFactor,
+  traceShotPath, dealDamage, isFriendlyFire, assignTeam, pickTeamSpawn,
+  sanitizeTeamChoice, sanitizeMode, sanitizeAppearance,
+  startReload, shieldSteps, broadcastShieldSteps,
+  nearestObstacleDistance, groundHeightAt, resetPlayerHistory,
+  broadcastScoreboard, broadcastAdminPlayers,
+});
 
 io.on('connection', (socket) => {
   async function handleJoin(payload) {
@@ -2049,6 +2130,7 @@ io.on('connection', (socket) => {
     socket.emit('your-money', { money: player.money });
 
     socket.broadcast.emit('player-joined', { id: socket.id, pseudo, team, mode, position: spawn, appearance, groupId });
+    if (groupId) botManager.syncGroup(groupId); // les bots du groupe entrent en jeu avec le premier humain
     broadcastScoreboard(); // le nouvel arrivant (à 0-0) apparaît chez tout le monde, et reçoit le tableau
     broadcastAdminPlayers();
     adminTools.sendPlayers(socket);

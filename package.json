@@ -1,6 +1,6 @@
 {
   "name": "mini-warzone-server",
-  "version": "0.1.26",
+  "version": "0.1.28",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,6 +10,7 @@
   "dependencies": {
     "socket.io": "^4.8.3",
     "firebase-admin": "^13.5.0",
+    "nodemailer": "^6.9.16",
     "three": "^0.169.0",
     "three-mesh-bvh": "^0.8.3"
   }
