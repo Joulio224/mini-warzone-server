@@ -16,7 +16,7 @@ import { createAdminTools } from './admin-tools.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createCollisionWorld } from './collision-world.js';
 import { createBotManager } from './bots.js';
-import { createEmailVerification, HttpError } from './email-verification.js';
+import { createSignupVerification, HttpError } from './signup-verification.js';
 import { randomUUID } from 'node:crypto';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -43,10 +43,11 @@ catch { throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON doit contenir un JSON val
 const firebaseAdminApp = getApps()[0] || initializeApp({ credential: cert(serviceAccount) });
 const firebaseAuth = getAuth(firebaseAdminApp);
 const firebaseDb = getFirestore(firebaseAdminApp);
-// Vérification des nouveaux comptes par code envoyé par mail (voir email-verification.js)
-const emailVerification = createEmailVerification({
+// Création de compte avec code envoyé par mail (voir signup-verification.js)
+const signupVerification = createSignupVerification({
   firebaseAuth,
   firebaseDb,
+  FieldValue,
   fallbackSecret: serviceAccount.private_key,
 });
 
@@ -993,49 +994,30 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
 
-  // --- Vérification du compte par code (voir email-verification.js) ------------------------
-  if (pathname.startsWith('/auth/')) {
+  // --- Inscription avec code par mail (voir signup-verification.js) ----------------------
+  // Routes ouvertes : le compte n'existe pas encore. Les limites par IP / adresse sont dans le module.
+  if (req.method === 'POST' && (pathname === '/auth/signup/request-code' || pathname === '/auth/signup/confirm')) {
     const sendJson = (status, body) => {
       res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(body));
     };
     try {
-      const tokenMatch = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ''));
-      if (!tokenMatch) throw new HttpError(401, 'Authentification requise.');
-      let decoded;
-      try {
-        decoded = await firebaseAuth.verifyIdToken(tokenMatch[1], true);
-      } catch {
-        throw new HttpError(401, 'Session expirée. Reconnecte-toi puis réessaie.');
+      let raw = '';
+      for await (const chunk of req) {
+        raw += chunk;
+        if (raw.length > 2048) throw new HttpError(413, 'Requête trop grande.');
       }
-
-      if (req.method === 'GET' && pathname === '/auth/status') {
-        sendJson(200, { verified: await emailVerification.isVerified(decoded.uid) });
-      } else if (req.method === 'POST' && pathname === '/auth/send-code') {
-        await emailVerification.sendCode(decoded.uid, decoded.email); // adresse du jeton, jamais celle du client
-        sendJson(200, { success: true });
-      } else if (req.method === 'POST' && pathname === '/auth/verify-code') {
-        let body = '';
-        for await (const chunk of req) {
-          body += chunk;
-          if (body.length > 1024) throw new HttpError(413, 'Requête trop grande.');
-        }
-        let parsed = {};
-        try { parsed = JSON.parse(body || '{}'); } catch { throw new HttpError(400, 'Requête invalide.'); }
-        await emailVerification.verifyCode(decoded.uid, parsed.code);
-        sendJson(200, { success: true });
-      } else if (req.method === 'POST' && pathname === '/auth/cancel-signup') {
-        // Erreur de frappe dans l'e-mail : un compte NON vérifié peut être supprimé pour recommencer
-        if (await emailVerification.isVerified(decoded.uid)) throw new HttpError(403, 'Ce compte est vérifié : utilise la suppression de compte.');
-        await deleteAccountData(decoded.uid);
-        await firebaseDb.collection('emailVerifications').doc(decoded.uid).delete().catch(() => {});
-        await firebaseAuth.deleteUser(decoded.uid);
-        sendJson(200, { success: true });
+      let body = {};
+      try { body = JSON.parse(raw || '{}'); } catch { throw new HttpError(400, 'Requête invalide.'); }
+      const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'inconnue';
+      if (pathname === '/auth/signup/request-code') {
+        await signupVerification.requestCode(body.email, ip);
       } else {
-        throw new HttpError(404, 'Route introuvable.');
+        await signupVerification.confirmAndCreate(body, ip);
       }
+      sendJson(200, { success: true });
     } catch (error) {
-      if (!(error instanceof HttpError)) console.error('[VERIF] Erreur :', error);
+      if (!(error instanceof HttpError)) console.error('[INSCRIPTION] Erreur :', error);
       sendJson(error instanceof HttpError ? error.status : 500, {
         error: error instanceof HttpError ? error.message : 'Erreur du serveur. Réessaie dans un moment.',
       });
@@ -1084,9 +1066,6 @@ io.use(async (socket, next) => {
     const token = socket.handshake.auth?.idToken;
     if (!token) return next(new Error('Authentification Firebase requise.'));
     const decoded = await firebaseAuth.verifyIdToken(token, true);
-    // Compte créé après la mise en place du code par mail : il doit l'avoir saisi (jamais
-    // seulement côté client : un client modifié ne doit pas pouvoir sauter l'écran de vérification).
-    if (!(await emailVerification.isVerified(decoded.uid))) return next(new Error('Compte non vérifié : saisis le code reçu par mail.'));
     const userDoc = await firebaseDb.collection('users').doc(decoded.uid).get();
     if (!userDoc.exists) return next(new Error('Compte introuvable ou supprimé.'));
     await userDoc.ref.update({ lastSeenAt: FieldValue.serverTimestamp() });

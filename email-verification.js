@@ -70,13 +70,24 @@ export function createEmailVerification({ firebaseAuth, firebaseDb, fallbackSecr
   const codesRef = (uid) => firebaseDb.collection('emailVerifications').doc(uid);
   const hashCode = (uid, code) => crypto.createHmac('sha256', secret).update(`${uid}:${code}`).digest('hex');
 
-  // Vérifié = a saisi son code, OU compte créé avant la mise en place du système.
+  // Vérifié = a saisi son code, OU compte créé avant la mise en place du système (ou exigence coupée).
+  // Dans ces deux derniers cas on pose aussi le claim, pour que les règles Firestore (qui exigent
+  // emailCodeVerified) laissent passer les anciens comptes sans script de migration : c'est fait
+  // tout seul à leur prochaine connexion.
   async function isVerified(uid) {
-    if (!enabled) return true;
     const record = await firebaseAuth.getUser(uid);
     if (record.customClaims?.emailCodeVerified === true) return true;
     const createdMs = Date.parse(record.metadata?.creationTime || '');
-    return Number.isFinite(createdMs) && createdMs < requiredFromMs;
+    const legacy = Number.isFinite(createdMs) && createdMs < requiredFromMs;
+    if (!enabled || legacy) {
+      try {
+        await firebaseAuth.setCustomUserClaims(uid, { ...(record.customClaims || {}), emailCodeVerified: true });
+      } catch (error) {
+        console.error('[VERIF] Claim impossible à poser pour un ancien compte :', error.message);
+      }
+      return true;
+    }
+    return false;
   }
 
   async function sendCode(uid, email) {
